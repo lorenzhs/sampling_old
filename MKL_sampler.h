@@ -156,7 +156,9 @@ struct MKL_sampler {
     }
 
 
-    static void generate_block(int *dest, size_t size, double p, gen_method method, unsigned int seed = 0) {
+    static void generate_block(int *dest, size_t size, double p,
+                               gen_method method = gen_method::geometric,
+                               unsigned int seed = 0) {
         VSLStreamStatePtr stream;
         if (seed == 0) {
             std::random_device rd;
