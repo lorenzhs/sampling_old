@@ -5,6 +5,7 @@
 #include "arg_parser.h"
 #include "util.h"
 #include "MKL_sampler.h"
+#include "std_sampler.h"
 
 int main(int argc, char** argv) {
     arg_parser args(argc, argv);
