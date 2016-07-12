@@ -1,5 +1,7 @@
 rand
 rand_*
+perf.data
+perf.data.old
 # Created by https://www.gitignore.io/api/c++
 
 ### C++ ###
