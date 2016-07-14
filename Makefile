@@ -4,7 +4,7 @@ MKLROOT ?= /opt/intel/composer_xe_2015.2.164/mkl
 MKL ?= ${MKLROOT}/lib/intel64
 MKLFLAGS = -L${MKL} -lmkl_intel_lp64 -lmkl_core -lmkl_sequential
 
-LDFLAGS=${MKLFLAGS} -ldl -lpthread
+LDFLAGS=-Wl,-Bstatic ${MKLFLAGS} -Wl,-Bdynamic -ldl -lpthread
 
 CFLAGS=-std=c++14 -I${MKLROOT}/include -Ofast -g -DNDEBUG -Wall -Wextra -Werror
 
