@@ -65,6 +65,7 @@ struct std_sampler {
                                      double p, unsigned int seed = 0) {
         assert(p >= 0 && p <= 1);
         // handle degenerate cases
+        /*
         if (1.0 - p < nearly_zero) {
             for (auto it = begin; it < end; ++it) {
                 *it = 1;
@@ -72,6 +73,7 @@ struct std_sampler {
         } else if (p < nearly_zero) {
             return;
         }
+        */
 
         if (seed == 0) {
             seed = std::random_device{}();
@@ -79,7 +81,7 @@ struct std_sampler {
         std::mt19937 gen(seed);
         std::geometric_distribution<long> dist(p);
 
-        for (auto it = begin + dist(gen); it < end; ++it) {
+        for (auto it = begin; it < end; ++it) {
             *it = dist(gen);
         }
     }
