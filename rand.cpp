@@ -108,7 +108,15 @@ int main(int argc, char** argv) {
     std::cout << "Running warmup (size " << warmup_size << ")" << std::endl;
     run([warmup_size, p](auto data, int /* thread */, int /* iteration */) {
             MKL_sampler::generate_block(data, warmup_size, p);
-            inplace_prefix_sum_unroll(data, data + warmup_size);
+            /* Fuck GCC and Intel.
+             *
+             * No seriously, fuck them. Without this call here, wildly
+             * inefficient code is generated for std_sampler. If I call
+             * inplace_prefix_sum here, std_sampler will be ~20% slower and
+             * inplace_prefix_sum will be weird, too, and MKL behaves oddly too.
+             */
+            inplace_prefix_sum_unroll<12>(data, data + warmup_size);
+
             std_sampler::generate_block(data, warmup_size, p);
             inplace_prefix_sum(data, data + warmup_size);
         }, data, num_threads, 1, "warmup");
@@ -120,8 +128,8 @@ int main(int argc, char** argv) {
             timer t;
             MKL_sampler::generate_block(data, size, p);
             double t_sample = t.get_and_reset();
-            // unrolling 12 times is fastest on my machine
-            inplace_prefix_sum_unroll<12>(data, data + size);
+
+            inplace_prefix_sum(data, data + size);
             double t_prefsum = t.get();
 
             // timer output is in milliseconds
