@@ -91,6 +91,10 @@ int main(int argc, char** argv) {
     static std::mutex cout_mutex;
     const bool verbose = args.is_set("v");
 
+    std::cout << "Bernoulli sampler, " << size << " samples per thread "
+              << "with p = " << p << " and " << num_threads << " thread(s), "
+              << iterations << " iteration(s)." << std::endl;
+
     auto data = std::vector<std::unique_ptr<int[]>>(num_threads);
     // initialize in parallel
     run([size, &data](auto /* dataptr */, int thread, int /* iteration */) {
