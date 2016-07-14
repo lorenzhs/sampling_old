@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
     // Measure MKL_sampler
     std::cout << "Running measurements..." << std::endl;
     run([size, p, num_threads, verbose]
-        (int *data, int thread_id, int iteration){
+        (auto data, int thread_id, int iteration){
             timer t;
             MKL_sampler::generate_block(data, size, p);
             double t_sample = t.get_and_reset();
@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
 
     // Measure std_sampler
     run([size, p, num_threads, verbose]
-        (int *data, int thread_id, int iteration){
+        (auto data, int thread_id, int iteration){
             timer t;
             std_sampler::generate_block(data, size, p);
             double t_sample = t.get_and_reset();
