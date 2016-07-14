@@ -6,7 +6,7 @@ MKLFLAGS = -L${MKL} -lmkl_intel_lp64 -lmkl_core -lmkl_sequential
 
 LDFLAGS=${MKLFLAGS} -ldl -lpthread
 
-CFLAGS=-std=c++14 -I${MKLROOT}/include -Ofast -g -DNDEBUG
+CFLAGS=-std=c++14 -I${MKLROOT}/include -Ofast -g -DNDEBUG -Wall -Wextra -Werror
 
 flags ?= # runtime flags
 
