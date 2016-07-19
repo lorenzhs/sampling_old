@@ -43,8 +43,8 @@ void inplace_prefix_sum_unroll(It begin, It end) {
     }
 }
 
-template <typename F>
-void run(F&& runner, const std::vector<std::unique_ptr<int[]>> &data,
+template <typename T, typename F>
+void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
          int num_threads, int iterations, std::string name,
          const std::string extra = "", const bool verbose = false) {
 

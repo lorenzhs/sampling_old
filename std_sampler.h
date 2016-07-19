@@ -86,8 +86,9 @@ struct std_sampler {
         }
     }
 
-    static void generate_block(int *dest, size_t size, double p,
-                                     unsigned int seed = 0) {
+    template <typename It>
+    static void generate_block(It dest, size_t size, double p,
+                               unsigned int seed = 0) {
         generate_block(dest, dest+size, p, seed);
     }
 
