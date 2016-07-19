@@ -46,7 +46,7 @@ void inplace_prefix_sum_unroll(It begin, It end) {
 template <typename F>
 void run(F&& runner, const std::vector<std::unique_ptr<int[]>> &data,
          int num_threads, int iterations, std::string name,
-         const bool verbose = false) {
+         const std::string extra = "", const bool verbose = false) {
 
     std::vector<std::thread> threads;
     threads.reserve(num_threads);
@@ -71,7 +71,8 @@ void run(F&& runner, const std::vector<std::unique_ptr<int[]>> &data,
         if (verbose)
             std::cout << "RESULT runner=" << name << " time=" << time
                       << " num_threads=" << num_threads
-                      << " iteration=" << iteration << std::endl;
+                      << " iteration=" << iteration
+                      << extra << std::endl;
     }
 
     std::cout << "RESULT runner=" << name
@@ -79,12 +80,12 @@ void run(F&& runner, const std::vector<std::unique_ptr<int[]>> &data,
               << " stddev=" << stats.stddev()
               << " numthreads=" << num_threads
               << " iterations=" << iterations
-              << std::endl;
+              << extra << std::endl;
 }
 
 int main(int argc, char** argv) {
     arg_parser args(argc, argv);
-    size_t size = args.get<size_t>("s", 1<<28);
+    size_t size = args.get<size_t>("s", 1<<24);
     double p = args.get<double>("p", 0.1);
     int num_threads = args.get<int>("t", 1);
     int iterations = args.get<int>("i", 1);
@@ -121,6 +122,10 @@ int main(int argc, char** argv) {
             inplace_prefix_sum(data, data + warmup_size);
         }, data, num_threads, 1, "warmup");
 
+    std::stringstream extra_stream;
+    extra_stream << " size=" << size << " p=" << p;
+    auto extra = extra_stream.str();
+
     // Measure MKL_sampler
     std::cout << "Running measurements..." << std::endl;
     run([size, p, num_threads, verbose]
@@ -146,7 +151,7 @@ int main(int argc, char** argv) {
                     << " iteration=" << iteration << std::endl;
                 cout_mutex.unlock();
             }
-        }, data, num_threads, iterations, "mkl");
+        }, data, num_threads, iterations, "mkl", extra);
 
 
     // Measure std_sampler
@@ -172,5 +177,5 @@ int main(int argc, char** argv) {
                     << " iteration=" << iteration << std::endl;
                 cout_mutex.unlock();
             }
-        }, data, num_threads, iterations, "std");
+        }, data, num_threads, iterations, "std", extra);
 }
