@@ -5,7 +5,7 @@
 #define likely(x)   __builtin_expect((x), 1)
 #define unlikely(x) __builtin_expect((x), 0)
 
-static double nearly_zero = 1e-10;
+//static double nearly_zero = 1e-10;
 
 void wait_for_gdb() {
     // attaching gdb and cont'ing will make it continue

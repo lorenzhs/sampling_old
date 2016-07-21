@@ -7,7 +7,7 @@
 
 #include "util.h"
 
-struct std_sampler {
+struct std_gen {
     template <typename OutputIterator>
     static void generate_block(OutputIterator begin, OutputIterator end,
                                double p, unsigned int seed = 0) {

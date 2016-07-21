@@ -72,7 +72,8 @@ int main(int argc, char** argv) {
     int num_threads = args.get<int>("t", 1);
     int iterations = args.get<int>("i", 1);
     static std::mutex cout_mutex;
-    const bool verbose = args.is_set("v");
+    const bool verbose = args.is_set("v") || args.is_set("vv");
+    const bool very_verbose = args.is_set("vv");
 
     double p; size_t ssize;
     std::tie(p, ssize) = calc_params(universe, k);
@@ -91,40 +92,50 @@ int main(int argc, char** argv) {
         }, data, num_threads, 1, "init");
 
     // warmup
-    size_t warmup_size = std::min<size_t>(1024*1024, ssize);
-    std::cout << "Running warmup (size " << warmup_size << ")" << std::endl;
-    run([warmup_size, p](auto data, int /* thread */, int /* iteration */) {
-            MKL_sampler::generate_block(data, warmup_size, p);
-            /* Fuck GCC and Intel.
-             *
-             * No seriously, fuck them. Without this call here, wildly
-             * inefficient code is generated for std_sampler. If I call
-             * inplace_prefix_sum here, std_sampler will be ~20% slower and
-             * inplace_prefix_sum will be weird, too, and MKL behaves oddly too.
-             */
-            sampler::inplace_prefix_sum_unroll<12>(data, data + warmup_size);
+    run([k, universe](auto data, int /* thread */, int /* iteration */) {
+            size_t k_warmup = std::min<size_t>(1<<16, k);
+            double p_warmup; size_t ssize_warmup;
+            std::tie(p_warmup, ssize_warmup) = calc_params(universe, k_warmup);
+            std::cout << "Running warmup (" << k_warmup << " samples)"
+                      << std::endl;
 
-            std_sampler::generate_block(data, warmup_size, p);
-            sampler::inplace_prefix_sum(data, data + warmup_size);
+            // MKL_gen
+            sampler::sample(
+                data, ssize_warmup, k_warmup, p_warmup, universe,
+                [](auto begin, auto end, double p, unsigned int seed)
+                { return MKL_gen::generate_block(
+                        begin, end-begin, p,
+                        MKL_gen::gen_method::geometric, seed); },
+                [](auto begin, auto end)
+                { return sampler::inplace_prefix_sum(begin, end); });
+
+            // std_gen
+            sampler::sample(
+                data, ssize_warmup, k_warmup, p_warmup, universe,
+                [](auto begin, auto end, double p, unsigned int seed)
+                { return std_gen::generate_block(begin, end, p, seed); },
+                [](auto begin, auto end)
+                { return sampler::inplace_prefix_sum(begin, end); });
         }, data, num_threads, 1, "warmup");
 
     std::stringstream extra_stream;
-    extra_stream << " ssize=" << ssize << " p=" << p;
+    extra_stream << " k=" << k << " b=" << ssize
+                 << " p=" << p << " N=" << universe;
     auto extra = extra_stream.str();
 
-    // Measure MKL_sampler
+    // Measure MKL_gen
     std::cout << "Running measurements..." << std::endl;
-    run([universe, k, p, ssize, num_threads, verbose]
+    run([universe, k, p, ssize, num_threads, verbose, very_verbose]
         (auto data, int thread_id, int iteration){
-
             auto msg = sampler::sample(
                 data, ssize, k, p, universe,
                 [](auto begin, auto end, double p, unsigned int seed)
-                { return MKL_sampler::generate_block(
+                { return MKL_gen::generate_block(
                         begin, end-begin, p,
-                        MKL_sampler::gen_method::geometric, seed); });
-
-            //MKL_sampler::generate_block(data, ssize, p);
+                        MKL_gen::gen_method::geometric, seed); },
+                [](auto begin, auto end)
+                { return sampler::inplace_prefix_sum(begin, end); },
+                very_verbose);
 
             if (verbose) {
                 cout_mutex.lock();
@@ -138,13 +149,16 @@ int main(int argc, char** argv) {
         }, data, num_threads, iterations, "mkl", extra);
 
 
-    // Measure std_sampler
-    run([universe, k, p, ssize, num_threads, verbose]
+    // Measure std_gen
+    run([universe, k, p, ssize, num_threads, verbose, very_verbose]
         (auto data, int thread_id, int iteration){
             auto msg = sampler::sample(
                 data, ssize, k, p, universe,
                 [](auto begin, auto end, double p, unsigned int seed)
-                { return std_sampler::generate_block(begin, end, p, seed); });
+                { return std_gen::generate_block(begin, end, p, seed); },
+                [](auto begin, auto end)
+                { return sampler::inplace_prefix_sum(begin, end); },
+                very_verbose);
 
             if (verbose) {
                 cout_mutex.lock();
