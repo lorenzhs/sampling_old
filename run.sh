@@ -1,19 +1,14 @@
 #!/bin/bash
 
-U='2^31'
-iterations=100
+universe=$((2**30))
 
 # sequential
-for logsize in {5..27}; do
-    echo "==============================="
-    echo "Running with 2^$logsize samples"
-    size=$((2**$logsize))
-    ratio=$(echo "$size / ($U)" | bc -l) # shell math is meh
-    ./rand -t 1 -s $size -p $ratio -i $iterations $@
-    echo "==============================="
+for logsamples in {10..27}; do
+    echo "==============================================="
+    samples=$((2**$logsamples))
+    iterations=$((2**30 / $samples))
+    echo "Running with 2^$logsamples samples ($iterations iterations)"
+    time ./rand -t 1 -k $samples -n $universe -i $iterations $@
+    echo "==============================================="
     echo ""
 done
-
-#for a in {100,1000,10000,100000,1000000}; do
-    # generate a*p samples on p processors
-#done
