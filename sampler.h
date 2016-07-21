@@ -8,6 +8,16 @@
 #include "timer.h"
 
 struct sampler {
+    // Formulas from "Sequential Random Sampling" by Ahrens and Dieter, 1985
+    static auto calc_params(size_t universe, size_t k /* samples */) {
+        double r = sqrt(k);
+        double a = sqrt(log(1+k/(2*M_PI)));
+        a = a + a*a/(3.0 * r);
+        size_t b = k + size_t(4 * a * r);
+        double p = (k + a * r) / universe;
+        return std::make_pair(p, b);
+    }
+
     template <typename It>
     static void inplace_prefix_sum(It begin, It end) {
         using value_type = typename std::iterator_traits<It>::value_type;

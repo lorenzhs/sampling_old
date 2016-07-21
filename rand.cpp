@@ -53,17 +53,6 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
 }
 
 
-// Formulas from "Sequential Random Sampling" by Ahrens and Dieter, 1985
-static constexpr auto calc_params(size_t universe, size_t k /* samples */) {
-    double r = sqrt(k);
-    double a = sqrt(log(1+k/(2*M_PI)));
-    a = a + a*a/(3.0 * r);
-    size_t b = k + size_t(4 * a * r);
-    double p = (k + a * r) / universe;
-    return std::make_pair(p, b);
-}
-
-
 int main(int argc, char** argv) {
     arg_parser args(argc, argv);
     size_t universe = args.get<size_t>("n", 1<<30);
@@ -76,7 +65,7 @@ int main(int argc, char** argv) {
     const bool very_verbose = args.is_set("vv");
 
     double p; size_t ssize;
-    std::tie(p, ssize) = calc_params(universe, k);
+    std::tie(p, ssize) = sampler::calc_params(universe, k);
 
     std::cout << "Geometric sampler, " << k << " samples per thread "
               << "(p = " << p << ") from universe of size " << universe
@@ -92,12 +81,14 @@ int main(int argc, char** argv) {
         }, data, num_threads, 1, "init");
 
     // warmup
-    run([k, universe](auto data, int /* thread */, int /* iteration */) {
+    run([k, universe](auto data, int thread, int /* iteration */) {
             size_t k_warmup = std::min<size_t>(1<<16, k);
             double p_warmup; size_t ssize_warmup;
-            std::tie(p_warmup, ssize_warmup) = calc_params(universe, k_warmup);
-            std::cout << "Running warmup (" << k_warmup << " samples)"
-                      << std::endl;
+            std::tie(p_warmup, ssize_warmup) =
+                sampler::calc_params(universe, k_warmup);
+            if (thread == 0)
+                std::cout << "Running warmup (" << k_warmup << " samples)"
+                          << std::endl;
 
             // MKL_gen
             sampler::sample(
