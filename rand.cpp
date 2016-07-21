@@ -7,41 +7,10 @@
 #include "arg_parser.h"
 #include "benchmark.h"
 #include "util.h"
-#include "MKL_sampler.h"
-#include "std_sampler.h"
+#include "sampler.h"
+#include "MKL_gen.h"
+#include "std_gen.h"
 
-template <typename It>
-void inplace_prefix_sum(It begin, It end) {
-    using value_type = typename std::iterator_traits<It>::value_type;
-
-    if (begin == end) return;
-    value_type sum = *begin;
-
-    while (++begin != end) {
-        sum += *begin;
-        *begin = sum;
-    }
-}
-
-template <size_t unroll = 8, typename It>
-void inplace_prefix_sum_unroll(It begin, It end) {
-    using value_type = typename std::iterator_traits<It>::value_type;
-    value_type sum = 0;
-
-    while(begin + unroll < end) {
-        faux_unroll<unroll>::call(
-            [&](size_t i){
-                sum += *(begin + i);
-                *(begin + i) = sum;
-            });
-        begin += unroll;
-    }
-
-    while (begin < end) {
-        sum += *begin;
-        *begin++ = sum;
-    }
-}
 
 template <typename T, typename F>
 void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
@@ -83,29 +52,46 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
               << extra << std::endl;
 }
 
+
+// Formulas from "Sequential Random Sampling" by Ahrens and Dieter, 1985
+static constexpr auto calc_params(size_t universe, size_t k /* samples */) {
+    double r = sqrt(k);
+    double a = sqrt(log(1+k/(2*M_PI)));
+    a = a + a*a/(3.0 * r);
+    size_t b = k + size_t(4 * a * r);
+    double p = (k + a * r) / universe;
+    return std::make_pair(p, b);
+}
+
+
 int main(int argc, char** argv) {
     arg_parser args(argc, argv);
-    size_t size = args.get<size_t>("s", 1<<24);
-    double p = args.get<double>("p", 0.1);
+    size_t universe = args.get<size_t>("n", 1<<30);
+    size_t k = args.get<size_t>("k", 1<<20); // sample size
+
     int num_threads = args.get<int>("t", 1);
     int iterations = args.get<int>("i", 1);
     static std::mutex cout_mutex;
     const bool verbose = args.is_set("v");
 
-    std::cout << "Bernoulli sampler, " << size << " samples per thread "
-              << "with p = " << p << " and " << num_threads << " thread(s), "
+    double p; size_t ssize;
+    std::tie(p, ssize) = calc_params(universe, k);
+
+    std::cout << "Geometric sampler, " << k << " samples per thread "
+              << "(p = " << p << ") from universe of size " << universe
+              << ", using " << num_threads << " thread(s), "
               << iterations << " iteration(s)." << std::endl;
 
     auto data = std::vector<std::unique_ptr<int[]>>(num_threads);
     // initialize in parallel
-    run([size, &data](auto /* dataptr */, int thread, int /* iteration */) {
-            data[thread] = std::make_unique<int[]>(size); // weak scaling
+    run([ssize, &data](auto /* dataptr */, int thread, int /* iteration */) {
+            data[thread] = std::make_unique<int[]>(ssize); // weak scaling
             // ensure that the memory is initialized
-            std::fill(data[thread].get(), data[thread].get() + size, 0);
+            std::fill(data[thread].get(), data[thread].get() + ssize, 0);
         }, data, num_threads, 1, "init");
 
     // warmup
-    size_t warmup_size = std::min<size_t>(1024*1024, size);
+    size_t warmup_size = std::min<size_t>(1024*1024, ssize);
     std::cout << "Running warmup (size " << warmup_size << ")" << std::endl;
     run([warmup_size, p](auto data, int /* thread */, int /* iteration */) {
             MKL_sampler::generate_block(data, warmup_size, p);
@@ -116,65 +102,57 @@ int main(int argc, char** argv) {
              * inplace_prefix_sum here, std_sampler will be ~20% slower and
              * inplace_prefix_sum will be weird, too, and MKL behaves oddly too.
              */
-            inplace_prefix_sum_unroll<12>(data, data + warmup_size);
+            sampler::inplace_prefix_sum_unroll<12>(data, data + warmup_size);
 
             std_sampler::generate_block(data, warmup_size, p);
-            inplace_prefix_sum(data, data + warmup_size);
+            sampler::inplace_prefix_sum(data, data + warmup_size);
         }, data, num_threads, 1, "warmup");
 
     std::stringstream extra_stream;
-    extra_stream << " size=" << size << " p=" << p;
+    extra_stream << " ssize=" << ssize << " p=" << p;
     auto extra = extra_stream.str();
 
     // Measure MKL_sampler
     std::cout << "Running measurements..." << std::endl;
-    run([size, p, num_threads, verbose]
+    run([universe, k, p, ssize, num_threads, verbose]
         (auto data, int thread_id, int iteration){
-            timer t;
-            MKL_sampler::generate_block(data, size, p);
-            double t_sample = t.get_and_reset();
 
-            inplace_prefix_sum(data, data + size);
-            double t_prefsum = t.get();
+            auto msg = sampler::sample(
+                data, ssize, k, p, universe,
+                [](auto begin, auto end, double p, unsigned int seed)
+                { return MKL_sampler::generate_block(
+                        begin, end-begin, p,
+                        MKL_sampler::gen_method::geometric, seed); });
 
-            // timer output is in milliseconds
+            //MKL_sampler::generate_block(data, ssize, p);
+
             if (verbose) {
                 cout_mutex.lock();
-                std::cout
-                    << "RESULT size=" << size << " p=" << p
-                    << " time=" << t_sample + t_prefsum
-                    << " throughput=" << size*1000.0 / (t_sample + t_prefsum)
-                    << " method=mkl t_sample=" << t_sample
-                    << " t_prefsum=" << t_prefsum
-                    << " thread_id=" << thread_id
-                    << " num_threads=" << num_threads
-                    << " iteration=" << iteration << std::endl;
+                // timer output is in milliseconds
+                std::cout << msg << " method=mkl"
+                          << " thread_id=" << thread_id
+                          << " num_threads=" << num_threads
+                          << " iteration=" << iteration << std::endl;
                 cout_mutex.unlock();
             }
         }, data, num_threads, iterations, "mkl", extra);
 
 
     // Measure std_sampler
-    run([size, p, num_threads, verbose]
+    run([universe, k, p, ssize, num_threads, verbose]
         (auto data, int thread_id, int iteration){
-            timer t;
-            std_sampler::generate_block(data, size, p);
-            double t_sample = t.get_and_reset();
-            inplace_prefix_sum(data, data + size);
-            double t_prefsum = t.get();
+            auto msg = sampler::sample(
+                data, ssize, k, p, universe,
+                [](auto begin, auto end, double p, unsigned int seed)
+                { return std_sampler::generate_block(begin, end, p, seed); });
 
             if (verbose) {
                 cout_mutex.lock();
                 // timer output is in milliseconds
-                std::cout
-                    << "RESULT size=" << size << " p=" << p
-                    << " time=" << t_sample + t_prefsum
-                    << " throughput=" << size*1000.0 / (t_sample + t_prefsum)
-                    << " method=std t_sample=" << t_sample
-                    << " t_prefsum=" << t_prefsum
-                    << " thread_id=" << thread_id
-                    << " num_threads=" << num_threads
-                    << " iteration=" << iteration << std::endl;
+                std::cout << msg << " method=std"
+                          << " thread_id=" << thread_id
+                          << " num_threads=" << num_threads
+                          << " iteration=" << iteration << std::endl;
                 cout_mutex.unlock();
             }
         }, data, num_threads, iterations, "std", extra);
