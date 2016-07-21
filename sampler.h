@@ -59,7 +59,8 @@ struct sampler {
             seed = std::random_device{}();
         }
         std::mt19937 gen(seed);
-        std::uniform_int_distribution<size_t> dist(0, end-begin);
+        // -1 because range is inclusive
+        std::uniform_int_distribution<size_t> dist(0, end-begin-1);
 
         size_t to_remove = (end-begin) - k;
 
