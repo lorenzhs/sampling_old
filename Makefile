@@ -7,7 +7,7 @@ MKLFLAGS = -L${MKL} -lmkl_intel_lp64 -lmkl_core -lmkl_sequential
 LDFLAGS=-Wl,-Bstatic ${MKLFLAGS} -Wl,-Bdynamic -ldl -lpthread
 
 CFLAGS=-std=c++14 -I${MKLROOT}/include -Wall -Wextra -Werror -g
-CFLAGS+=-Ofast -DNDEBUG -march=native -flto
+CFLAGS+=-Ofast -DNDEBUG -march=native -flto=8
 CFLAGS+=-IDistributedSampling/lib -IDistributedSampling/lib/tools -IDistributedSampling/extern/stocc
 MPATH=DistributedSampling/optimized/extern
 
