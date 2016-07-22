@@ -8,13 +8,15 @@ LDFLAGS=-Wl,-Bstatic ${MKLFLAGS} -Wl,-Bdynamic -ldl -lpthread
 
 CFLAGS=-std=c++14 -I${MKLROOT}/include -Wall -Wextra -Werror -g
 CFLAGS+=-Ofast -DNDEBUG -march=native -flto
+CFLAGS+=-IDistributedSampling/lib -IDistributedSampling/lib/tools -IDistributedSampling/extern/stocc
+MPATH=DistributedSampling/optimized/extern
 
 flags ?= # runtime flags
 
 .PHONY: rand
 
 rand: rand.cpp *.h
-	${CXX} ${CFLAGS} -o rand rand.cpp ${LDFLAGS}
+	${CXX} ${CFLAGS} -o rand rand.cpp ${LDFLAGS} ${MPATH}/mersenne/*.o ${MPATH}/stocc/*.o
 
 run:
 	@LD_LIBRARY_PATH=${MKL} ./rand ${flags}

@@ -6,6 +6,7 @@
 #include <random>
 
 #include "timer.h"
+#include <sampling/methodR.h>
 
 struct sampler {
     // Formulas from "Sequential Random Sampling" by Ahrens and Dieter, 1985
@@ -53,8 +54,8 @@ struct sampler {
 
 
     template <typename It>
-    static auto fix(It begin, It end, size_t k, unsigned int seed = 0) {
-        assert(size > k);
+    static auto fix_stable(It begin, It end, size_t k, unsigned int seed = 0) {
+        assert(end - begin > (long)k);
         if (seed == 0) {
             seed = std::random_device{}();
         }
@@ -74,6 +75,43 @@ struct sampler {
 
         // compact
         return std::remove(begin, end, -1);
+    }
+
+
+    template <typename It>
+    static auto fix(It begin, It end, size_t k, unsigned int seed = 0) {
+        assert(end-begin > (long)k);
+        size_t to_remove = (end-begin) - k;
+
+        auto indices = std::make_unique<size_t[]>(to_remove);
+        ssize_t pos = 0;
+
+        if (seed == 0) {
+            seed = std::random_device{}();
+        }
+
+        // Configure & run sampler to pick elements to delete
+        const size_t basecase = 512;
+        HashSampling<> hs((ULONG)seed);
+        hs.resizeTable((end-begin)*1.2/to_remove * basecase, basecase);
+        SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
+        s.sample(end-begin, to_remove, [&](auto index) {
+                indices[pos++] = index;
+        });
+
+        // Sort indices so we can process them in one sweep
+        std::sort(indices.get(), indices.get() + to_remove);
+
+        auto last = end - 1;
+        // handle case where the last element is to be removed
+        // revert last postincrement even if loop doesn't match
+        while (begin + indices[--pos] == last) { --last; }
+        while (pos >= 0) { // revert last postincrement before loop
+            //std::iter_swap(begin + indices[pos--], last--);
+            *(begin + indices[pos--]) = std::move(*last--);
+        }
+
+        return last + 1;
     }
 
     /**
