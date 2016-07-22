@@ -81,15 +81,12 @@ int main(int argc, char** argv) {
         }, data, num_threads, 1, "init");
 
     // warmup
-    run([k, universe](auto data, int thread, int /* iteration */) {
-            size_t k_warmup = std::min<size_t>(1<<16, k);
+    size_t k_warmup = std::min<size_t>(1<<16, k);
+    std::cout << "Running warmup (" << k_warmup << " samples)" << std::endl;
+    run([k_warmup, universe](auto data, int /*thread*/, int /*iteration*/) {
             double p_warmup; size_t ssize_warmup;
             std::tie(p_warmup, ssize_warmup) =
                 sampler::calc_params(universe, k_warmup);
-            if (thread == 0)
-                std::cout << "Running warmup (" << k_warmup << " samples)"
-                          << std::endl;
-
             // MKL_gen
             sampler::sample(
                 data, ssize_warmup, k_warmup, p_warmup, universe,
@@ -107,7 +104,7 @@ int main(int argc, char** argv) {
                 { return std_gen::generate_block(begin, end, p, seed); },
                 [](auto begin, auto end)
                 { return sampler::inplace_prefix_sum(begin, end); });
-        }, data, num_threads, 1, "warmup");
+        }, data, num_threads, 100, "warmup");
 
     std::stringstream extra_stream;
     extra_stream << " k=" << k << " b=" << ssize
