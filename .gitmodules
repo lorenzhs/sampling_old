@@ -1,0 +1,3 @@
+[submodule "DistributedSampling"]
+	path = DistributedSampling
+	url = https://github.com/sebalamm/DistributedSampling

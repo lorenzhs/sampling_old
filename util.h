@@ -1,5 +1,7 @@
 #pragma once
 
+#define DSFMT_MEXP 19937
+
 #include <csignal>
 
 #define likely(x)   __builtin_expect((x), 1)

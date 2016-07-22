@@ -92,8 +92,8 @@ struct sampler {
 
         // Configure & run sampler to pick elements to delete
         const size_t basecase = 512;
-        HashSampling<> hs((ULONG)seed);
-        hs.resizeTable((end-begin)*1.2/to_remove * basecase, basecase);
+        HashSampling<> hs((ULONG)seed, to_remove);
+        //hs.resizeTable((end-begin)*1.2/to_remove * basecase, basecase);
         SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
         s.sample(end-begin, to_remove, [&](auto index) {
                 indices[pos++] = index;
