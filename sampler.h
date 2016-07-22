@@ -129,6 +129,7 @@ struct sampler {
         double t_gen(0.0), t_pref(0.0), t_check(0.0), t_fix(0.0);
         size_t its = 0; // how many iterations it took
         timer t;
+        size_t usable_samples = 0;
 
         do {
             t.reset();
@@ -142,20 +143,21 @@ struct sampler {
             // pos is the first one that's too large.
             pos = std::lower_bound(dest, dest+ssize, universe);
             t_check += t.get_and_reset();
+            usable_samples = pos - dest;
 
             ++its;
             if (verbose)
-                std::cout << "\tIt " << its << ": got " << pos-dest
+                std::cout << "\tIt " << its << ": got " << usable_samples
                           << " samples in range (" << k << " required) => "
-                          << (pos - dest) - k << " to delete, "
-                          << dest + ssize - pos << " outside universe ignored"
-                          << std::endl;
-        } while (pos < (dest + ssize) && (pos - dest) < (long)k);
+                          << usable_samples - k << " to delete, "
+                          << ssize - usable_samples
+                          << " outside universe ignored" << std::endl;
+        } while (pos == (dest + ssize) || usable_samples < k);
         // first condition is that the whole universe is covered (i.e. ssize was
         // big enough) and second condition is that >= k samples lie within it
 
         t.reset();
-        if (pos - dest > (long)k) {
+        if (usable_samples > k) {
             // pick k out of the pos-dest-1 elements
             pos = fix(dest, pos, k, seed);
             // pos is now the past-the-end iterator of the sample indices
