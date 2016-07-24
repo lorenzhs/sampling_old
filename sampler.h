@@ -27,7 +27,7 @@ struct sampler {
         value_type sum = *begin;
 
         while (++begin != end) {
-            sum += *begin;
+            sum += *begin + 1;
             *begin = sum;
         }
     }
@@ -40,7 +40,7 @@ struct sampler {
         while(begin + unroll < end) {
             faux_unroll<unroll>::call(
                 [&](size_t i){
-                    sum += *(begin + i);
+                    sum += *(begin + i) + 1;
                     *(begin + i) = sum;
                 });
             begin += unroll;
@@ -134,6 +134,9 @@ struct sampler {
         do {
             t.reset();
             gen_block(dest, dest+ssize, p, seed);
+            // ensure a new seed is used in every iteration
+            // (0 = generate a random seed)
+            if (seed != 0) seed++;
             t_gen += t.get_and_reset();
 
             prefsum(dest, dest+ssize);
@@ -148,10 +151,11 @@ struct sampler {
             ++its;
             if (verbose)
                 std::cout << "\tIt " << its << ": got " << usable_samples
-                          << " samples in range (" << k << " required) => "
-                          << usable_samples - k << " to delete, "
-                          << ssize - usable_samples
-                          << " outside universe ignored" << std::endl;
+                          << " samples in range (" << k << " of " << ssize
+                          << " required) => " << usable_samples - k
+                          << " to delete, "  << ssize - usable_samples
+                          << " outside universe ignored (largest: "
+                          << *(dest + ssize - 1) << ")" << std::endl;
         } while (pos == (dest + ssize) || usable_samples < k);
         // first condition is that the whole universe is covered (i.e. ssize was
         // big enough) and second condition is that >= k samples lie within it
