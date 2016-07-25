@@ -52,6 +52,7 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
               << extra << std::endl;
 }
 
+using T = int;
 
 int main(int argc, char** argv) {
     arg_parser args(argc, argv);
@@ -72,10 +73,10 @@ int main(int argc, char** argv) {
               << ", using " << num_threads << " thread(s), "
               << iterations << " iteration(s)." << std::endl;
 
-    auto data = std::vector<std::unique_ptr<int[]>>(num_threads);
+    auto data = std::vector<std::unique_ptr<T[]>>(num_threads);
     // initialize in parallel
     run([ssize, &data](auto /* dataptr */, int thread, int /* iteration */) {
-            data[thread] = std::make_unique<int[]>(ssize); // weak scaling
+            data[thread] = std::make_unique<T[]>(ssize); // weak scaling
             // ensure that the memory is initialized
             std::fill(data[thread].get(), data[thread].get() + ssize, 0);
         }, data, num_threads, 1, "init");

@@ -178,7 +178,8 @@ struct sampler {
                << " t_gen=" << t_gen
                << " t_prefsum=" << t_pref
                << " t_check=" << t_check
-               << " t_fix=" << t_fix;
+               << " t_fix=" << t_fix
+               << " fixer=fast";
         return stream.str();
     }
 };
