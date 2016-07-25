@@ -49,6 +49,7 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
               << " stddev=" << stats.stddev()
               << " numthreads=" << num_threads
               << " iterations=" << iterations
+              << " fixer=fast"
               << extra << std::endl;
 }
 
