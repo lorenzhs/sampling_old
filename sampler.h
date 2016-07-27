@@ -123,12 +123,13 @@ struct sampler {
     template <typename It, typename F, typename G>
     static auto sample(It dest, size_t ssize, size_t k, double p,
                        size_t universe, F&& gen_block, G&& prefsum,
+                       global_stats *stats = nullptr,
                        const bool verbose = false, unsigned int seed = 0)
     {
         It pos;
-        double t_gen(0.0), t_pref(0.0), t_check(0.0), t_fix(0.0);
+        double t_gen(0.0), t_pref(0.0), t_fix(0.0);
         size_t its = 0; // how many iterations it took
-        timer t;
+        timer t, t_total;
         size_t usable_samples = 0;
 
         do {
@@ -145,7 +146,6 @@ struct sampler {
             // find out how many samples are within the universe.
             // pos is the first one that's too large.
             pos = std::lower_bound(dest, dest+ssize, universe);
-            t_check += t.get_and_reset();
             usable_samples = pos - dest;
 
             ++its;
@@ -174,15 +174,22 @@ struct sampler {
         }
         t_fix += t.get_and_reset();
 
+        double t_sum = t_total.get();
+        if (stats != nullptr) {
+            stats->push_sum(t_sum);
+            stats->push_gen(t_gen);
+            stats->push_prefsum(t_pref);
+            stats->push_fix(t_fix);
+        }
+
         std::stringstream stream;
         stream << "INFO"
-               << " time=" << t_gen + t_pref + t_check + t_fix
+               << " time=" << t_sum
                << " k=" << k
                << " b=" << ssize
                << " restarts=" << its-1
                << " t_gen=" << t_gen
                << " t_prefsum=" << t_pref
-               << " t_check=" << t_check
                << " t_fix=" << t_fix
 #ifdef FIX_STABLE
                << " fixer=stable";

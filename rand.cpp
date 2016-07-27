@@ -19,7 +19,7 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
 
     std::vector<std::thread> threads;
     threads.reserve(num_threads);
-    statistics stats;
+    global_stats stats;
     timer t; // start the clock
 
     for (int iteration = 0; iteration < iterations; ++iteration) {
@@ -27,7 +27,8 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
 
         t.reset();
         for (int thread = 0; thread < num_threads; ++thread) {
-            threads.emplace_back(runner, data[thread].get(), thread, iteration);
+            threads.emplace_back(runner, data[thread].get(), thread, iteration,
+                                 &stats);
         }
 
         for (auto &thread : threads) {
@@ -35,7 +36,6 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
         }
 
         double time = t.get();
-        stats.push(time);
         // we can't print the other info because it's encapsulated in the runner
         if (verbose)
             std::cout << "RESULT runner=" << name << " time=" << time
@@ -45,8 +45,14 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
     }
 
     std::cout << "RESULT runner=" << name
-              << " time=" << stats.avg()
-              << " stddev=" << stats.stddev()
+              << " time=" << stats.s_sum.avg()
+              << " stddev=" << stats.s_sum.stddev()
+              << " t_gen=" << stats.s_gen.avg()
+              << " t_gen_dev=" << stats.s_gen.stddev()
+              << " t_fix=" << stats.s_fix.avg()
+              << " t_fix_dev=" << stats.s_fix.stddev()
+              << " t_pref=" << stats.s_prefsum.avg()
+              << " t_pref_dev=" << stats.s_prefsum.stddev()
               << " numthreads=" << num_threads
               << " iterations=" << iterations
 #ifdef FIX_STABLE
@@ -84,7 +90,8 @@ int main(int argc, char** argv) {
 
     auto data = std::vector<std::unique_ptr<T[]>>(num_threads);
     // initialize in parallel
-    run([ssize, &data](auto /* dataptr */, int thread, int /* iteration */) {
+    run([ssize, &data]
+        (auto /* dataptr */, int thread, int /* iteration */, auto /*stats*/) {
             data[thread] = std::make_unique<T[]>(ssize); // weak scaling
             // ensure that the memory is initialized
             std::fill(data[thread].get(), data[thread].get() + ssize, 0);
@@ -93,7 +100,8 @@ int main(int argc, char** argv) {
     // warmup
     size_t k_warmup = std::min<size_t>(1<<16, k);
     std::cout << "Running warmup (" << k_warmup << " samples)" << std::endl;
-    run([k_warmup, universe](auto data, int /*thread*/, int /*iteration*/) {
+    run([k_warmup, universe]
+        (auto data, int /*thread*/, int /*iteration*/, auto stats) {
             double p_warmup; size_t ssize_warmup;
             std::tie(p_warmup, ssize_warmup) =
                 sampler::calc_params(universe, k_warmup);
@@ -106,7 +114,7 @@ int main(int argc, char** argv) {
                         begin, end-begin, p,
                         MKL_gen::gen_method::geometric, seed); },
                 [](auto begin, auto end)
-                { return sampler::inplace_prefix_sum(begin, end); });
+                { return sampler::inplace_prefix_sum(begin, end); }, stats);
 #endif
 
             // std_gen
@@ -115,7 +123,7 @@ int main(int argc, char** argv) {
                 [](auto begin, auto end, double p, unsigned int seed)
                 { return std_gen::generate_block(begin, end, p, seed); },
                 [](auto begin, auto end)
-                { return sampler::inplace_prefix_sum(begin, end); });
+                { return sampler::inplace_prefix_sum(begin, end); }, stats);
         }, data, num_threads, 100, "warmup");
 
     std::stringstream extra_stream;
@@ -127,7 +135,7 @@ int main(int argc, char** argv) {
     std::cout << "Running measurements..." << std::endl;
 #ifndef USE64BIT
     run([universe, k, p, ssize, num_threads, verbose, very_verbose]
-        (auto data, int thread_id, int iteration){
+        (auto data, int thread_id, int iteration, auto stats){
             auto msg = sampler::sample(
                 data, ssize, k, p, universe,
                 [](auto begin, auto end, double p, unsigned int seed)
@@ -136,7 +144,7 @@ int main(int argc, char** argv) {
                         MKL_gen::gen_method::geometric, seed); },
                 [](auto begin, auto end)
                 { return sampler::inplace_prefix_sum(begin, end); },
-                very_verbose);
+                stats, very_verbose);
 
             if (verbose) {
                 cout_mutex.lock();
@@ -153,14 +161,14 @@ int main(int argc, char** argv) {
 
     // Measure std_gen
     run([universe, k, p, ssize, num_threads, verbose, very_verbose]
-        (auto data, int thread_id, int iteration){
+        (auto data, int thread_id, int iteration, auto stats){
             auto msg = sampler::sample(
                 data, ssize, k, p, universe,
                 [](auto begin, auto end, double p, unsigned int seed)
                 { return std_gen::generate_block(begin, end, p, seed); },
                 [](auto begin, auto end)
                 { return sampler::inplace_prefix_sum(begin, end); },
-                very_verbose);
+                stats, very_verbose);
 
             if (verbose) {
                 cout_mutex.lock();

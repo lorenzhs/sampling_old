@@ -44,3 +44,11 @@ struct statistics {
         return sqrt(nvar / (count - 1));
     }
 };
+
+struct global_stats {
+    void push_sum(double t) { s_sum.push(t); }
+    void push_gen(double t) { s_gen.push(t); }
+    void push_prefsum(double t) { s_prefsum.push(t); }
+    void push_fix(double t) { s_fix.push(t); }
+    statistics s_sum, s_gen, s_prefsum, s_fix;
+};
