@@ -152,7 +152,8 @@ struct sampler {
             if (verbose)
                 std::cout << "\tIt " << its << ": got " << usable_samples
                           << " samples in range (" << k << " of " << ssize
-                          << " required) => " << usable_samples - k
+                          << " required) => "
+                          << (long long)usable_samples - (long long)k
                           << " to delete, "  << ssize - usable_samples
                           << " outside universe ignored (largest: "
                           << *(dest + ssize - 1) << ")" << std::endl;
