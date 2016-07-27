@@ -53,7 +53,11 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
               << extra << std::endl;
 }
 
-using T = int;
+#ifndef USE64BIT
+using T = int32_t;
+#else
+using T = int64_t;
+#endif
 static std::mutex cout_mutex;
 
 int main(int argc, char** argv) {
@@ -90,6 +94,7 @@ int main(int argc, char** argv) {
             std::tie(p_warmup, ssize_warmup) =
                 sampler::calc_params(universe, k_warmup);
             // MKL_gen
+#ifndef USE64BIT
             sampler::sample(
                 data, ssize_warmup, k_warmup, p_warmup, universe,
                 [](auto begin, auto end, double p, unsigned int seed)
@@ -98,6 +103,7 @@ int main(int argc, char** argv) {
                         MKL_gen::gen_method::geometric, seed); },
                 [](auto begin, auto end)
                 { return sampler::inplace_prefix_sum(begin, end); });
+#endif
 
             // std_gen
             sampler::sample(
@@ -115,6 +121,7 @@ int main(int argc, char** argv) {
 
     // Measure MKL_gen
     std::cout << "Running measurements..." << std::endl;
+#ifndef USE64BIT
     run([universe, k, p, ssize, num_threads, verbose, very_verbose]
         (auto data, int thread_id, int iteration){
             auto msg = sampler::sample(
@@ -137,6 +144,7 @@ int main(int argc, char** argv) {
                 cout_mutex.unlock();
             }
         }, data, num_threads, iterations, "mkl", extra);
+#endif
 
 
     // Measure std_gen

@@ -15,13 +15,30 @@ LDFLAGS+=${MPATH}/mersenne/*.o ${MPATH}/stocc/stoc1.o ${MPATH}/stocc/wnchyppr.o 
 
 flags ?= # runtime flags
 
+# use 64-bit integers
+ifneq ($(B64),)
+CFLAGS+=-DUSE64BIT
+SUFF:=64
+endif
+
+# explicit 32-bit integer suffix
+ifeq ($(B64),0)
+SUFF:=32
+endif
+
+# use stable fixer
+ifneq ($(STABLE),)
+CFLAGS+=-DSTABLE
+SUFF:=${SUFF}S
+endif
+
 .PHONY: rand
 
 rand: rand.cpp *.h
-	${CXX} ${CFLAGS} ${OPT} -o rand rand.cpp ${LDFLAGS}
+	${CXX} ${CFLAGS} ${OPT} -o rand${SUFF} rand.cpp ${LDFLAGS}
 
 debug:
-	${CXX} ${CFLAGS} ${DEBUG} -o rand rand.cpp ${LDFLAGS}
+	${CXX} ${CFLAGS} ${DEBUG} -o rand${SUFF}-dbg rand.cpp ${LDFLAGS}
 
 run:
 	@LD_LIBRARY_PATH=${MKL} ./rand ${flags}

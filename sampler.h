@@ -164,7 +164,11 @@ struct sampler {
         t.reset();
         if (usable_samples > k) {
             // pick k out of the pos-dest-1 elements
+#ifdef FIX_STABLE
+            pos = fix_stable(dest, pos, k, seed);
+#else
             pos = fix(dest, pos, k, seed);
+#endif
             // pos is now the past-the-end iterator of the sample indices
             assert(pos - dest == (long)k);
         }
