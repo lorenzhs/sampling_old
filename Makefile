@@ -16,14 +16,14 @@ LDFLAGS+=${MPATH}/mersenne/*.o ${MPATH}/stocc/stoc1.o ${MPATH}/stocc/wnchyppr.o 
 flags ?= # runtime flags
 
 # use 64-bit integers
+# explicit 32-bit integer suffix
+ifeq ($(B64),0)
+SUFF:=32
+else
 ifneq ($(B64),)
 CFLAGS+=-DUSE64BIT
 SUFF:=64
 endif
-
-# explicit 32-bit integer suffix
-ifeq ($(B64),0)
-SUFF:=32
 endif
 
 # use stable fixer
