@@ -54,6 +54,7 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
 }
 
 using T = int;
+static std::mutex cout_mutex;
 
 int main(int argc, char** argv) {
     arg_parser args(argc, argv);
@@ -62,7 +63,6 @@ int main(int argc, char** argv) {
 
     int num_threads = args.get<int>("t", 1);
     int iterations = args.get<int>("i", 1);
-    static std::mutex cout_mutex;
     const bool verbose = args.is_set("v") || args.is_set("vv");
     const bool very_verbose = args.is_set("vv");
 

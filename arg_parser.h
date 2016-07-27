@@ -65,7 +65,7 @@ public:
 
     /// get a data argument by its index (among the data arguments)
     std::string data_arg(const size_t index) const {
-        assert(0 <= index && index < num_data_args());
+        assert(index < num_data_args());
         return data_args[index];
     }
 
