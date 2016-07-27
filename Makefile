@@ -28,13 +28,16 @@ endif
 
 # use stable fixer
 ifneq ($(STABLE),)
-CFLAGS+=-DSTABLE
+CFLAGS+=-DFIX_STABLE
 SUFF:=${SUFF}S
 endif
 
 .PHONY: rand
 
 rand: rand.cpp *.h
+ifneq ($(SUFF),)
+	@echo "Output name is rand${SUFF}"
+endif
 	${CXX} ${CFLAGS} ${OPT} -o rand${SUFF} rand.cpp ${LDFLAGS}
 
 debug:

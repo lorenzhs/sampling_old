@@ -184,7 +184,11 @@ struct sampler {
                << " t_prefsum=" << t_pref
                << " t_check=" << t_check
                << " t_fix=" << t_fix
+#ifdef FIX_STABLE
+               << " fixer=stable";
+#else
                << " fixer=fast";
+#endif
         return stream.str();
     }
 };
