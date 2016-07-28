@@ -1,6 +1,6 @@
 CXX ?= g++
 
-MKLROOT ?= /opt/intel/composer_xe_2015.2.164/mkl
+MKLROOT ?= /opt/intel/compilers_and_libraries/linux/mkl
 MKL ?= ${MKLROOT}/lib/intel64
 MKLFLAGS = -L${MKL} -lmkl_intel_lp64 -lmkl_core -lmkl_sequential
 
