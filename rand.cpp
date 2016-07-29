@@ -20,7 +20,9 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
     std::vector<std::thread> threads;
     threads.reserve(num_threads);
     global_stats stats;
-    timer t; // start the clock
+    // stats for multi-threaded version including sync / load imbalance
+    statistics mt_stats;
+    timer t;
 
     for (int iteration = 0; iteration < iterations; ++iteration) {
         threads.clear();
@@ -36,6 +38,8 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
         }
 
         double time = t.get();
+        mt_stats.push(time);
+
         // we can't print the other info because it's encapsulated in the runner
         if (verbose)
             std::cout << "RESULT runner=" << name << " time=" << time
@@ -46,8 +50,11 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
 
     std::cout << "RESULT runner=" << name
               << " time=" << stats.s_sum.avg()
-              << " stddev=" << stats.s_sum.stddev()
-              << " t_gen=" << stats.s_gen.avg()
+              << " stddev=" << stats.s_sum.stddev();
+    if (num_threads > 1)
+        std::cout << " mt_time=" << mt_stats.avg()
+                  << " mt_dev=" << mt_stats.stddev();
+    std::cout << " t_gen=" << stats.s_gen.avg()
               << " t_gen_dev=" << stats.s_gen.stddev()
               << " t_fix=" << stats.s_fix.avg()
               << " t_fix_dev=" << stats.s_fix.stddev()
