@@ -45,3 +45,9 @@ debug:
 
 run:
 	@LD_LIBRARY_PATH=${MKL} ./rand ${flags}
+
+buildall:
+	B64=0 make rand
+	B64=0 STABLE=1 make rand
+	B64=1 make rand
+	B64=1 STABLE=1 make rand
