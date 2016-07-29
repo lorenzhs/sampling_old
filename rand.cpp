@@ -28,13 +28,17 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
         threads.clear();
 
         t.reset();
-        for (int thread = 0; thread < num_threads; ++thread) {
-            threads.emplace_back(runner, data[thread].get(), thread, iteration,
-                                 &stats);
-        }
+        if (num_threads > 1) {
+            for (int thread = 0; thread < num_threads; ++thread) {
+                threads.emplace_back(runner, data[thread].get(), thread,
+                                     iteration, &stats);
+            }
 
-        for (auto &thread : threads) {
-            thread.join();
+            for (auto &thread : threads) {
+                thread.join();
+            }
+        } else {
+            runner(data[0].get(), 0, iteration, &stats);
         }
 
         double time = t.get();
