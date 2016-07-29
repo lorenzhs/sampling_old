@@ -56,21 +56,33 @@ struct sampler {
     template <typename It>
     static auto fix_stable(It begin, It end, size_t k, unsigned int seed = 0) {
         assert(end - begin > (long)k);
+        size_t to_remove = (end-begin) - k;
+
         if (seed == 0) {
             seed = std::random_device{}();
         }
-        std::mt19937 gen(seed);
-        // -1 because range is inclusive
-        std::uniform_int_distribution<size_t> dist(0, end-begin-1);
 
-        size_t to_remove = (end-begin) - k;
-
-        while (to_remove > 0) {
-            size_t pos = dist(gen);
-            if (*(begin + pos) > -1) {
-                *(begin + pos) = -1;
-                to_remove--;
+        if (k < (1 << 18)) {
+            // For small sample sizes, Algorithm R has more overhead
+            std::mt19937 gen(seed);
+            // -1 because range is inclusive
+            std::uniform_int_distribution<size_t> dist(0, end-begin-1);
+            while (to_remove > 0) {
+                size_t pos = dist(gen);
+                if (*(begin + pos) > -1) {
+                    *(begin + pos) = -1;
+                    to_remove--;
+                }
             }
+        } else {
+            // For large sample sizes, using Algorithm R is faster
+            // Configure & run sampler to pick elements to delete
+            const size_t basecase = 512;
+            HashSampling<> hs((ULONG)seed, to_remove);
+            SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
+            s.sample(end-begin, to_remove, [&](auto pos) {
+                    *(begin + pos) = -1;
+                });
         }
 
         // compact
