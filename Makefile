@@ -11,7 +11,7 @@ OPT=-Ofast -DNDEBUG -march=native -flto=8
 DEBUG=-O0 -march=native
 CFLAGS+=-IDistributedSampling/lib -IDistributedSampling/lib/tools -IDistributedSampling/extern/stocc -IDistributedSampling/extern/dSFMT
 MPATH=DistributedSampling/optimized/extern
-LDFLAGS+=${MPATH}/mersenne/*.o ${MPATH}/stocc/stoc1.o ${MPATH}/stocc/wnchyppr.o ${MPATH}/dSFMT/dSFMT.o
+LDFLAGS+=libstocc.a
 
 flags ?= # runtime flags
 
