@@ -124,8 +124,11 @@ struct sampler {
         if (seed == 0) {
             seed = std::random_device{}();
         }
+        auto holes = std::make_unique<int64_t[]>(to_remove + 1);
+        holes[0] = -1; // dummy
+        size_t hole_idx = 1;
 
-        if (k < (1 << 16)) {
+        if (k < (1<<20) || to_remove < 1024) {
             // For small sample sizes, Algorithm R has more overhead
             std::mt19937 gen(seed);
             // -1 because range is inclusive
@@ -135,31 +138,25 @@ struct sampler {
                 if (*(begin + pos) > -1) {
                     *(begin + pos) = -1;
                     to_remove--;
+                    holes[hole_idx++] = pos;
                 }
             }
-
-            return std::remove(begin, end, -1);
-
-            } else {
+        } else {
             // For large sample sizes, using Algorithm R is faster
             // Configure & run sampler to pick elements to delete
-            auto holes = std::make_unique<int64_t[]>(to_remove + 1);
-            holes[0] = -1; // dummy
-            size_t hole_idx = 1;
 
             const size_t basecase = 512;
             // SORTED hash sampling
             HashSampling<> hs((ULONG)seed, to_remove);
             SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
             s.sample(end-begin, to_remove, [&](auto pos) {
-                    *(begin + pos) = -1;
+                    // *(begin + pos) = -1;
                     holes[hole_idx++] = pos;
                 });
-            assert(hole_idx == to_remove + 1);
-            std::sort(holes.get(), holes.get() + to_remove + 1);
-
-            return compact(begin, end, holes.get(), to_remove);
         }
+        assert(hole_idx == to_remove + 1);
+        std::sort(holes.get(), holes.get() + to_remove + 1);
+        return compact(begin, end, holes.get(), to_remove);
     }
 
 

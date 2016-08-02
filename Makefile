@@ -41,6 +41,9 @@ endif
 	${CXX} ${CFLAGS} ${OPT} -o rand${SUFF} rand.cpp ${LDFLAGS}
 
 debug:
+ifneq ($(SUFF),)
+	@echo "Output name is rand${SUFF}-dbg"
+endif
 	${CXX} ${CFLAGS} ${DEBUG} -o rand${SUFF}-dbg rand.cpp ${LDFLAGS}
 
 run:
