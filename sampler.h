@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstring>
 #include <random>
 
 #include "timer.h"
@@ -87,6 +88,78 @@ struct sampler {
 
         // compact
         return std::remove(begin, end, -1);
+    }
+
+    // assumes holes[0] == 0 for simplified edge case handling
+    template <typename It>
+    static auto compact(It begin, It end, ssize_t* holes, size_t to_remove) {
+        using value_type = typename std::iterator_traits<It>::value_type;
+
+        It dest = begin;
+        for (size_t i = 0; i < to_remove; ++i) {
+            size_t size = holes[i+1] - holes[i] - 1;
+            //std::cout << "Moving " << size << " elements from index "
+            //          << holes[i] + 1 << " to " << dest-begin << std::endl;
+            memmove(dest, begin + holes[i] + 1, size * sizeof(value_type));
+            dest += size;
+        }
+        // do the last gap
+        auto srcpos = begin + holes[to_remove] + 1;
+        if (srcpos < end) {
+            // std::cout << "Moving last " << end-srcpos << " elements from "
+            //           << srcpos - begin << " to pos " << dest - begin
+            //           << " => last: " << dest + (end-srcpos) - begin
+            //           << " vs " << k << std::endl;
+            memmove(dest, srcpos, (end - srcpos) * sizeof(value_type));
+            dest += (end-srcpos);
+        }
+        return dest;
+    }
+
+    template <typename It>
+    static auto fix_stable_fast(It begin, It end, size_t k, unsigned int seed = 0) {
+        assert(end - begin > (long)k);
+        size_t to_remove = (end-begin) - k;
+
+        if (seed == 0) {
+            seed = std::random_device{}();
+        }
+
+        if (k < (1 << 16)) {
+            // For small sample sizes, Algorithm R has more overhead
+            std::mt19937 gen(seed);
+            // -1 because range is inclusive
+            std::uniform_int_distribution<size_t> dist(0, end-begin-1);
+            while (to_remove > 0) {
+                size_t pos = dist(gen);
+                if (*(begin + pos) > -1) {
+                    *(begin + pos) = -1;
+                    to_remove--;
+                }
+            }
+
+            return std::remove(begin, end, -1);
+
+            } else {
+            // For large sample sizes, using Algorithm R is faster
+            // Configure & run sampler to pick elements to delete
+            auto holes = std::make_unique<int64_t[]>(to_remove + 1);
+            holes[0] = -1; // dummy
+            size_t hole_idx = 1;
+
+            const size_t basecase = 512;
+            // SORTED hash sampling
+            HashSampling<> hs((ULONG)seed, to_remove);
+            SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
+            s.sample(end-begin, to_remove, [&](auto pos) {
+                    *(begin + pos) = -1;
+                    holes[hole_idx++] = pos;
+                });
+            assert(hole_idx == to_remove + 1);
+            std::sort(holes.get(), holes.get() + to_remove + 1);
+
+            return compact(begin, end, holes.get(), to_remove);
+        }
     }
 
 
@@ -177,7 +250,7 @@ struct sampler {
         if (usable_samples > k) {
             // pick k out of the pos-dest-1 elements
 #ifdef FIX_STABLE
-            pos = fix_stable(dest, pos, k, seed);
+            pos = fix_stable_fast(dest, pos, k, seed);
 #else
             pos = fix(dest, pos, k, seed);
 #endif
