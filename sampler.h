@@ -80,9 +80,10 @@ struct sampler {
     }
 
     template <typename It>
-    static auto pick_holes(It begin, It end, size_t k, unsigned int seed = 0) {
+    static auto pick_holes(It begin, It end, size_t k, unsigned int seed,
+                           bool sorted) {
         assert(end - begin > (long)k);
-        size_t to_remove = (end-begin) - k;
+        const size_t to_remove = (end-begin) - k;
 
         if (seed == 0) {
             seed = std::random_device{}();
@@ -96,11 +97,12 @@ struct sampler {
             std::mt19937 gen(seed);
             // -1 because range is inclusive
             std::uniform_int_distribution<size_t> dist(0, end-begin-1);
-            while (to_remove > 0) {
+            size_t remaining_to_remove = to_remove;
+            while (remaining_to_remove > 0) {
                 size_t pos = dist(gen);
                 if (*(begin + pos) > -1) {
                     *(begin + pos) = -1;
-                    to_remove--;
+                    remaining_to_remove--;
                     holes[hole_idx++] = pos;
                 }
             }
@@ -118,6 +120,12 @@ struct sampler {
                 });
         }
         assert(hole_idx == to_remove + 1);
+
+        // TODO use sorted sampler
+        if (sorted)
+            // first is -1, we can skip it
+            std::sort(holes.get() + 1, holes.get() + to_remove + 1);
+
         return holes;
     }
 
@@ -125,10 +133,10 @@ struct sampler {
     static auto fix_stable(It begin, It end, size_t k, unsigned int seed = 0) {
         assert(end - begin > (long)k);
 
-        auto holes = pick_holes(begin, end, k, seed);
+        // Get holes (sorted), then apply memmove compactor
+        auto holes = pick_holes(begin, end, k, seed, true);
 
         size_t to_remove = (end-begin) - k;
-        std::sort(holes.get(), holes.get() + to_remove + 1);
         return compact(begin, end, holes.get(), to_remove);
     }
 
@@ -138,9 +146,8 @@ struct sampler {
         assert(end-begin > (long)k);
         size_t to_remove = (end-begin) - k;
 
-        auto indices = pick_holes(begin, end, k, seed);
-        // Sort indices so we can process them in one sweep
-        std::sort(indices.get(), indices.get() + to_remove);
+        // Holes should be sorted so we can process them in one sweep
+        auto indices = pick_holes(begin, end, k, seed, true);
 
         auto last = end - 1;
         ssize_t pos = to_remove;

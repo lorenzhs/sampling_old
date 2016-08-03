@@ -1,8 +1,17 @@
 rand
 rand_*
+rand32*
+rand64*
+randS
+rand*-dbg
 r_*
 perf.data
 perf.data.old
+GPATH
+GRTAGS
+GTAGS
+logs/
+u_*
 # Created by https://www.gitignore.io/api/c++
 
 ### C++ ###
