@@ -53,43 +53,6 @@ struct sampler {
         }
     }
 
-
-    template <typename It>
-    static auto fix_stable(It begin, It end, size_t k, unsigned int seed = 0) {
-        assert(end - begin > (long)k);
-        size_t to_remove = (end-begin) - k;
-
-        if (seed == 0) {
-            seed = std::random_device{}();
-        }
-
-        if (k < (1 << 18)) {
-            // For small sample sizes, Algorithm R has more overhead
-            std::mt19937 gen(seed);
-            // -1 because range is inclusive
-            std::uniform_int_distribution<size_t> dist(0, end-begin-1);
-            while (to_remove > 0) {
-                size_t pos = dist(gen);
-                if (*(begin + pos) > -1) {
-                    *(begin + pos) = -1;
-                    to_remove--;
-                }
-            }
-        } else {
-            // For large sample sizes, using Algorithm R is faster
-            // Configure & run sampler to pick elements to delete
-            const size_t basecase = 512;
-            HashSampling<> hs((ULONG)seed, to_remove);
-            SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
-            s.sample(end-begin, to_remove, [&](auto pos) {
-                    *(begin + pos) = -1;
-                });
-        }
-
-        // compact
-        return std::remove(begin, end, -1);
-    }
-
     // assumes holes[0] == 0 for simplified edge case handling
     template <typename It>
     static auto compact(It begin, It end, ssize_t* holes, size_t to_remove) {
@@ -117,7 +80,7 @@ struct sampler {
     }
 
     template <typename It>
-    static auto fix_stable_fast(It begin, It end, size_t k, unsigned int seed = 0) {
+    static auto pick_holes(It begin, It end, size_t k, unsigned int seed = 0) {
         assert(end - begin > (long)k);
         size_t to_remove = (end-begin) - k;
 
@@ -145,7 +108,7 @@ struct sampler {
             // For large sample sizes, using Algorithm R is faster
             // Configure & run sampler to pick elements to delete
 
-            const size_t basecase = 512;
+            const size_t basecase = 1024;
             // SORTED hash sampling
             HashSampling<> hs((ULONG)seed, to_remove);
             SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
@@ -155,6 +118,16 @@ struct sampler {
                 });
         }
         assert(hole_idx == to_remove + 1);
+        return holes;
+    }
+
+    template <typename It>
+    static auto fix_stable(It begin, It end, size_t k, unsigned int seed = 0) {
+        assert(end - begin > (long)k);
+
+        auto holes = pick_holes(begin, end, k, seed);
+
+        size_t to_remove = (end-begin) - k;
         std::sort(holes.get(), holes.get() + to_remove + 1);
         return compact(begin, end, holes.get(), to_remove);
     }
@@ -165,30 +138,16 @@ struct sampler {
         assert(end-begin > (long)k);
         size_t to_remove = (end-begin) - k;
 
-        auto indices = std::make_unique<size_t[]>(to_remove);
-        ssize_t pos = 0;
-
-        if (seed == 0) {
-            seed = std::random_device{}();
-        }
-
-        // Configure & run sampler to pick elements to delete
-        const size_t basecase = 512;
-        HashSampling<> hs((ULONG)seed, to_remove);
-        //hs.resizeTable((end-begin)*1.2/to_remove * basecase, basecase);
-        SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
-        s.sample(end-begin, to_remove, [&](auto index) {
-                indices[pos++] = index;
-        });
-
+        auto indices = pick_holes(begin, end, k, seed);
         // Sort indices so we can process them in one sweep
         std::sort(indices.get(), indices.get() + to_remove);
 
         auto last = end - 1;
+        ssize_t pos = to_remove;
         // handle case where the last element is to be removed
         // revert last postincrement even if loop doesn't match
-        while (begin + indices[--pos] == last) { --last; }
-        while (pos >= 0) { // revert last postincrement before loop
+        if (begin + indices[--pos] == last) { --last; }
+        while (pos >= 0) {
             //std::iter_swap(begin + indices[pos--], last--);
             *(begin + indices[pos--]) = std::move(*last--);
         }
@@ -247,7 +206,7 @@ struct sampler {
         if (usable_samples > k) {
             // pick k out of the pos-dest-1 elements
 #ifdef FIX_STABLE
-            pos = fix_stable_fast(dest, pos, k, seed);
+            pos = fix_stable(dest, pos, k, seed);
 #else
             pos = fix(dest, pos, k, seed);
 #endif
