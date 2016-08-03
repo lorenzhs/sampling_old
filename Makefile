@@ -19,6 +19,7 @@ flags ?= # runtime flags
 # explicit 32-bit integer suffix
 ifeq ($(B64),0)
 SUFF:=32
+CFLAGS+=-DNOSTD
 else
 ifneq ($(B64),)
 CFLAGS+=-DUSE64BIT

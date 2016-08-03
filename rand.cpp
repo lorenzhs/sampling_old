@@ -126,6 +126,7 @@ int main(int argc, char** argv) {
                 { return sampler::inplace_prefix_sum(begin, end); }, stats);
 #endif
 
+#ifndef NOSTD
             // std_gen
             sampler::sample(
                 data, ssize_warmup, k_warmup, p_warmup, universe,
@@ -133,6 +134,7 @@ int main(int argc, char** argv) {
                 { return std_gen::generate_block(begin, end, p, seed); },
                 [](auto begin, auto end)
                 { return sampler::inplace_prefix_sum(begin, end); }, stats);
+#endif
         }, data, num_threads, 100, "warmup");
 
     std::stringstream extra_stream;
@@ -166,7 +168,7 @@ int main(int argc, char** argv) {
         }, data, num_threads, iterations, "mkl", extra);
 #endif
 
-
+#ifndef NOSTD
     // Measure std_gen
     run([universe, k, p, ssize, num_threads, verbose, very_verbose]
         (auto data, int thread_id, int iteration, auto stats){
@@ -188,4 +190,5 @@ int main(int argc, char** argv) {
                 cout_mutex.unlock();
             }
         }, data, num_threads, iterations, "std", extra);
+#endif
 }
