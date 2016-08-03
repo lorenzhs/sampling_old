@@ -1,11 +1,8 @@
 #pragma once
 
+#include <cassert>
 #include <limits>
 #include <random>
-#include <thread>
-#include <vector>
-
-#include "util.h"
 
 struct std_gen {
     template <typename It>

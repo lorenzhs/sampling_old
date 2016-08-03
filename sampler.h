@@ -53,7 +53,7 @@ struct sampler {
         }
     }
 
-    // assumes holes[0] == 0 for simplified edge case handling
+    // assumes holes[0] == -1 for simplified edge case handling
     template <typename It>
     static auto compact(It begin, It end, ssize_t* holes, size_t to_remove) {
         using value_type = typename std::iterator_traits<It>::value_type;

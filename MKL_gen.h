@@ -1,13 +1,10 @@
 #pragma once
 
-#include <cassert>
+#include <limits>
 #include <random>
 
 #include <mkl.h>
 #include <mkl_vsl.h>
-
-#include "util.h"
-#include "timer.h"
 
 #include "errcheck.inc"
 
@@ -22,9 +19,11 @@ struct MKL_gen {
         vslNewStream(&stream, VSL_BRNG_SFMT19937, seed);
 
         if (size >= std::numeric_limits<int>::max()) {
-            SERR << "Error: MKL_Sampler block size exceeds value range of int:"
-                 << size << " >= " << std::numeric_limits<int>::max()
-                 << std::endl;
+            std::cerr
+                << "Error: MKL_Sampler block size exceeds value range of int:"
+                << size << " >= " << std::numeric_limits<int>::max()
+                << std::endl;
+            exit(1);
         }
 
         int count = static_cast<int>(size);

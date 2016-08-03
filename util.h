@@ -1,41 +1,55 @@
 #pragma once
 
+#include <cmath>
+
 #define DSFMT_MEXP 19937
 
-#include <csignal>
+// template-based loop unrolling
+template <size_t N> struct faux_unroll {
+    template <typename F> static void call(F &&f) {
+        faux_unroll<N-1>::call(f);
+        f(N-1);
+    }
+};
 
-#define likely(x)   __builtin_expect((x), 1)
-#define unlikely(x) __builtin_expect((x), 0)
-
-//static double nearly_zero = 1e-10;
-
-void wait_for_gdb() {
-    // attaching gdb and cont'ing will make it continue
-    raise(SIGSTOP);
-}
-
-template <typename T, typename... Ts>
-std::unique_ptr<T> make_unique(Ts&&... params) {
-    return std::unique_ptr<T>(new T(std::forward<Ts>(params)...));
-}
-
-// find most siginificant one bit
-template <typename int_or_long = unsigned int>
-int highest_set_bit(int_or_long num) {
-    int msb;
-    asm("bsrl %1,%0" : "=r"(msb) : "r"(num));
-    return msb;
-}
+template <> struct faux_unroll<0> {
+    template <typename F> static void call(F &&) {}
+};
 
 
-// Some logging
-#define COUT std::cout << "PE " << comm.rank() << " "
-#define LOG  if (debug) std::cout << "PE " << comm.rank() << " "
-#define INFO if (debug) std::cout << "PE " << comm.rank() << " INFO @ " << __FILE__ ":" << __LINE__ << " (" << __PRETTY_FUNCTION__ << "): "
-#define ERR  std::cerr << "PE " << comm.rank() << " ERROR @ " << __FILE__ ":" << __LINE__ << " (" << __PRETTY_FUNCTION__ << "): "
-#define WARN std::cerr << "PE " << comm.rank() << " WARNING @ " << __FILE__ ":" << __LINE__ << " (" << __PRETTY_FUNCTION__ << "): "
-// Sequential versions (no communicator)
-#define SLOG  if (debug) std::cout
-#define SINFO if (debug) std::cout << "INFO @ " << __FILE__ ":" << __LINE__ << " (" << __PRETTY_FUNCTION__ << "): "
-#define SERR  std::cerr << "ERROR @ " << __FILE__ ":" << __LINE__ << " (" << __PRETTY_FUNCTION__ << "): "
-#define SWARN std::cerr << "WARNING @ " << __FILE__ ":" << __LINE__ << " (" << __PRETTY_FUNCTION__ << "): "
+struct statistics {
+    // Single-pass standard deviation calculation as described in Donald Knuth:
+    // The Art of Computer Programming, Volume 2, Chapter 4.2.2, Equations 15&16
+    double mean;
+    double nvar; // approx n * variance; stddev = sqrt(nvar / (count-1))
+    size_t count;
+
+    statistics() : mean(0.0), nvar(0.0), count(0) {}
+
+    void push(double t) {
+        ++count;
+        if (count == 1) {
+            mean = t;
+        } else {
+            double oldmean = mean;
+            mean += (t - oldmean) / count;
+            nvar += (t - oldmean) * (t - mean);
+        }
+    }
+
+    double avg() {
+        return mean;
+    }
+    double stddev() {
+        //assert(count > 1);
+        return sqrt(nvar / (count - 1));
+    }
+};
+
+struct global_stats {
+    void push_sum(double t) { s_sum.push(t); }
+    void push_gen(double t) { s_gen.push(t); }
+    void push_prefsum(double t) { s_prefsum.push(t); }
+    void push_fix(double t) { s_fix.push(t); }
+    statistics s_sum, s_gen, s_prefsum, s_fix;
+};

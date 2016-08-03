@@ -5,7 +5,6 @@
 #include <thread>
 
 #include "arg_parser.h"
-#include "benchmark.h"
 #include "util.h"
 #include "sampler.h"
 #include "MKL_gen.h"
