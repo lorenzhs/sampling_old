@@ -8,26 +8,18 @@
 #include "util.h"
 
 struct std_gen {
-    template <typename OutputIterator>
-    static void generate_block(OutputIterator begin, OutputIterator end,
-                               double p, unsigned int seed = 0) {
-        assert(p >= 0 && p <= 1);
-        // handle degenerate cases
-        /*
-        if (1.0 - p < nearly_zero) {
-            for (auto it = begin; it < end; ++it) {
-                *it = 1;
-            }
-        } else if (p < nearly_zero) {
-            return;
-        }
-        */
+    template <typename It>
+    static void generate_block(It begin, It end, double p,
+                               unsigned int seed = 0) {
+        using value_type = typename std::iterator_traits<It>::value_type;
+        assert(p > 0 && p < 1);
 
         if (seed == 0) {
             seed = std::random_device{}();
         }
+
         std::mt19937 gen(seed);
-        std::geometric_distribution<long> dist(p);
+        std::geometric_distribution<value_type> dist(p);
 
         for (auto it = begin; it < end; ++it) {
             *it = dist(gen);
