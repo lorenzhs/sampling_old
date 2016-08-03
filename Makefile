@@ -3,27 +3,29 @@ CXX ?= g++
 MKLROOT ?= /opt/intel/compilers_and_libraries/linux/mkl
 MKL ?= ${MKLROOT}/lib/intel64
 MKLFLAGS = -L${MKL} -lmkl_intel_lp64 -lmkl_core -lmkl_sequential
+MKLLD = -Wl,-Bstatic ${MKLFLAGS} -Wl,-Bdynamic -ldl
 
-LDFLAGS=-Wl,-Bstatic ${MKLFLAGS} -Wl,-Bdynamic -ldl -lpthread
-
-CFLAGS=-std=c++14 -I${MKLROOT}/include -Wall -Wextra -Werror -g
+LDFLAGS=-lpthread libstocc.a
+CFLAGS=-std=c++14 -Wall -Wextra -Werror -g
 OPT=-Ofast -DNDEBUG -march=native -flto=8
 DEBUG=-O0 -march=native
 CFLAGS+=-IDistributedSampling/lib -IDistributedSampling/lib/tools -IDistributedSampling/extern/stocc -IDistributedSampling/extern/dSFMT
-MPATH=DistributedSampling/optimized/extern
-LDFLAGS+=libstocc.a
 
 flags ?= # runtime flags
 
 # use 64-bit integers
 # explicit 32-bit integer suffix
-ifeq ($(B64),0)
+ifeq ($(B64),0) # we need MKL but remove std_gen
 SUFF:=32
-CFLAGS+=-DNOSTD
+CFLAGS+=-DNOSTD -I${MKLROOT}/include
+LDFLAGS+=${MKLLD}
 else
-ifneq ($(B64),)
+ifneq ($(B64),) #64-bit mode
 CFLAGS+=-DUSE64BIT
 SUFF:=64
+else # we need the MKL
+CFLAGS+=-I${MKLROOT}/include
+LDFLAGS+=${MKLLD}
 endif
 endif
 

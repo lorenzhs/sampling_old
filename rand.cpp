@@ -7,8 +7,14 @@
 #include "arg_parser.h"
 #include "util.h"
 #include "sampler.h"
+
+#ifndef USE64BIT
 #include "MKL_gen.h"
+#endif
+
+#ifndef NOSTD
 #include "std_gen.h"
+#endif
 
 
 template <typename T, typename F>
@@ -115,8 +121,8 @@ int main(int argc, char** argv) {
             double p_warmup; size_t ssize_warmup;
             std::tie(p_warmup, ssize_warmup) =
                 sampler::calc_params(universe, k_warmup);
-            // MKL_gen
 #ifndef USE64BIT
+            // MKL_gen
             sampler::sample(
                 data, ssize_warmup, k_warmup, p_warmup, universe,
                 [](auto begin, auto end, double p, unsigned int seed)
@@ -142,9 +148,10 @@ int main(int argc, char** argv) {
                  << " p=" << p << " N=" << universe;
     auto extra = extra_stream.str();
 
-    // Measure MKL_gen
     std::cout << "Running measurements..." << std::endl;
+
 #ifndef USE64BIT
+    // Measure MKL_gen
     run([universe, k, p, ssize, num_threads, verbose, very_verbose]
         (auto data, int thread_id, int iteration, auto stats){
             auto msg = sampler::sample(
