@@ -154,7 +154,7 @@ struct sampler {
         // handle case where the last element is to be removed
         // revert last postincrement even if loop doesn't match
         if (begin + indices[--pos] == last) { --last; }
-        while (pos >= 0) {
+        while (pos > 0) {
             //std::iter_swap(begin + indices[pos--], last--);
             *(begin + indices[pos--]) = std::move(*last--);
         }
