@@ -11,19 +11,8 @@
 
 #include "errcheck.inc"
 
-struct sampling_stats {
-    double t_gen, t_sample;
-    explicit sampling_stats(double gen = 0, double sample = 0)
-        : t_gen(gen)
-        , t_sample(sample)
-        {}
-};
-
 struct MKL_gen {
-    enum gen_method { bernoulli, geometric };
-
     static void generate_block(int *dest, size_t size, double p,
-                               gen_method method = gen_method::geometric,
                                unsigned int seed = 0) {
         VSLStreamStatePtr stream;
         if (seed == 0) {
@@ -39,16 +28,8 @@ struct MKL_gen {
         }
 
         int count = static_cast<int>(size);
-
-        int status;
-        if (method == gen_method::bernoulli) {
-            status = viRngBernoulli(VSL_RNG_METHOD_BERNOULLI_ICDF, stream, count, dest, p);
-        } else if (method == gen_method::geometric) {
-            status = viRngGeometric(VSL_RNG_METHOD_GEOMETRIC_ICDF, stream, count, dest, p);
-        } else {
-            std::cerr << "invalid generation method";
-            status = VSL_ERROR_BADARGS;
-        }
+        int status = viRngGeometric(VSL_RNG_METHOD_GEOMETRIC_ICDF, stream,
+                                    count, dest, p);
 
         vslDeleteStream(&stream);
         CheckVslError(status);

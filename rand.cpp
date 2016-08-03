@@ -122,8 +122,7 @@ int main(int argc, char** argv) {
                 data, ssize_warmup, k_warmup, p_warmup, universe,
                 [](auto begin, auto end, double p, unsigned int seed)
                 { return MKL_gen::generate_block(
-                        begin, end-begin, p,
-                        MKL_gen::gen_method::geometric, seed); },
+                        begin, end-begin, p, seed); },
                 [](auto begin, auto end)
                 { return sampler::inplace_prefix_sum(begin, end); }, stats);
 #endif
@@ -151,8 +150,7 @@ int main(int argc, char** argv) {
                 data, ssize, k, p, universe,
                 [](auto begin, auto end, double p, unsigned int seed)
                 { return MKL_gen::generate_block(
-                        begin, end-begin, p,
-                        MKL_gen::gen_method::geometric, seed); },
+                        begin, end-begin, p, seed); },
                 [](auto begin, auto end)
                 { return sampler::inplace_prefix_sum(begin, end); },
                 stats, very_verbose);
