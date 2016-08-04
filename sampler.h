@@ -244,6 +244,7 @@ struct sampler {
 
         It dest = begin;
         for (size_t i = 0; i < to_remove; ++i) {
+            assert(holes[i+1] > holes[i]);
             size_t size = holes[i+1] - holes[i] - 1;
             //std::cout << "Moving " << size << " elements from index "
             //          << holes[i] + 1 << " to " << dest-begin << std::endl;
