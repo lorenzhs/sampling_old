@@ -9,6 +9,8 @@
 
 #include "timer.h"
 #include <sampling/methodR.h>
+#include <sampling/methodH.h>
+#include <sampling/methodSH.h>
 
 struct sampler {
     // Formulas from "Sequential Random Sampling" by Ahrens and Dieter, 1985
@@ -291,25 +293,36 @@ struct sampler {
                     holes[hole_idx++] = pos;
                 }
             }
+            if (sorted)
+                std::sort(holes.get() + 1, holes.get() + to_remove + 1);
         } else {
             // For large sample sizes, using Algorithm R is faster
             // Configure & run sampler to pick elements to delete
 
             const size_t basecase = 1024;
             // SORTED hash sampling
-            HashSampling<> hs((ULONG)seed, to_remove);
-            SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
-            s.sample(end-begin, to_remove, [&](auto pos) {
-                    // *(begin + pos) = -1;
-                    holes[hole_idx++] = pos;
-                });
+            if (sorted) {
+                SortedHashSampling<> hs((ULONG)seed, to_remove);
+                SeqDivideSampling<StochasticLib1,SortedHashSampling<>> s(
+                    hs, basecase, (ULONG)seed);
+                s.sample(end-begin, to_remove, [&](auto pos) {
+                        // *(begin + pos) = -1;
+                        holes[hole_idx++] = pos;
+                    });
+            } else {
+                HashSampling<> hs((ULONG)seed, to_remove);
+                SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
+                s.sample(end-begin, to_remove, [&](auto pos) {
+                        // *(begin + pos) = -1;
+                        holes[hole_idx++] = pos;
+                    });
+            }
         }
         assert(hole_idx == to_remove + 1);
 
-        // TODO use sorted sampler
-        if (sorted)
-            // first is -1, we can skip it
-            std::sort(holes.get() + 1, holes.get() + to_remove + 1);
+        if (sorted) {
+            assert(std::is_sorted(holes.get() + 1, holes.get() + to_remove + 1));
+        }
 
         return holes;
     }

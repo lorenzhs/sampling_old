@@ -9,7 +9,7 @@ LDFLAGS=-lpthread libstocc.a
 CFLAGS=-std=c++14 -Wall -Wextra -Werror -g
 OPT=-Ofast -DNDEBUG -march=native -flto=8
 DEBUG=-O0 -march=native
-CFLAGS+=-IDistributedSampling/lib -IDistributedSampling/lib/tools -IDistributedSampling/extern/stocc -IDistributedSampling/extern/dSFMT
+CFLAGS+=-IDistributedSampling/lib -IDistributedSampling/lib/tools -IDistributedSampling/extern/stocc -IDistributedSampling/extern/mt19937-64 -IDistributedSampling/extern/dSFMT
 
 flags ?= # runtime flags
 
