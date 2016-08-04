@@ -41,7 +41,7 @@ struct sampler {
     // In-place prefix sum, optionally incrementing the sum between elements
     // (required for MKL geometric distribution...)
     template <bool addone, typename T>
-    static int inplace_prefix_sum_sse(T* data, size_t n) {
+    static void inplace_prefix_sum_sse(T* data, size_t n) {
         static_assert(std::is_same<T, int>::value, "can only do int");
         constexpr int elemsz = sizeof(T);
 
@@ -84,14 +84,77 @@ struct sampler {
         }
 
         // handle the leftover elements
-        T *ptr = (T*)datavec, *endptr = data + n;
-        T sum = *(ptr - 1);
-        while (ptr < endptr) {
-            sum += *ptr;
+        T *ptr = (T*)datavec;
+        *ptr += *(ptr-1);
+        inplace_prefix_sum<addone>(ptr, data+n);
+    }
+
+    // AVX adaptation of the SSE2 prefix sum above.
+    // Due to inter-lane shuffling, it's actually slower.
+    template <bool addone, typename T>
+    static void inplace_prefix_sum_avx(T* data, size_t n) {
+        static_assert(std::is_same<T, int>::value, "can only do int");
+        const T* end = data + n;
+
+        if (addone) data[0]--; // fix first element
+
+        T sum = 0;
+        // fix alignment
+        while (((size_t)data & 31) && data < end) {
+            sum += *data;
             if (addone) ++sum;
-            *ptr++ = sum;
+            *data++ = sum;
+            --n;
         }
-        return data[n-1];
+
+        __m256i *datavec = (__m256i*)data;
+        const int vec_elems = sizeof(*datavec)/sizeof(T);
+
+        // don't start an iteration beyond this
+        const __m256i *endp = (__m256i*) (data + n - 2*vec_elems);
+        __m256i carry = _mm256_set1_epi32(sum);
+        const __m256i ones = _mm256_set1_epi32(1);
+        const __m256i shuff_idx = _mm256_set1_epi32(7);
+
+        for(; datavec <= endp ; datavec += 2) {
+            __m256i x0 = _mm256_load_si256(datavec + 0);
+            __m256i x1 = _mm256_load_si256(datavec + 1); // unroll / pipeline by 1
+
+            if (addone) {
+                x0 = _mm256_add_epi32(x0, ones);
+                x1 = _mm256_add_epi32(x1, ones);
+            }
+
+            x0 = _mm256_add_epi32(x0,_mm256_alignr_epi8(x0,
+                 _mm256_permute2x128_si256(x0, x0, _MM_SHUFFLE(0, 0, 2, 0)), 12));
+            x1 = _mm256_add_epi32(x1, _mm256_alignr_epi8(x1,
+                 _mm256_permute2x128_si256(x1, x1, _MM_SHUFFLE(0, 0, 2, 0)), 12));
+
+            x0 = _mm256_add_epi32(x0, _mm256_alignr_epi8(x0,
+                 _mm256_permute2x128_si256(x0, x0, _MM_SHUFFLE(0, 0, 2, 0)), 8));
+            x1 = _mm256_add_epi32(x1, _mm256_alignr_epi8(x1,
+                 _mm256_permute2x128_si256(x1, x1, _MM_SHUFFLE(0, 0, 2, 0)), 8));
+
+            x0 = _mm256_add_epi32(x0, _mm256_permute2x128_si256(x0, x0, _MM_SHUFFLE(0, 0, 2, 0)));
+            x1 = _mm256_add_epi32(x1, _mm256_permute2x128_si256(x1, x1, _MM_SHUFFLE(0, 0, 2, 0)));
+
+            // more shifting if vec_elems is larger
+            // this has to go after the byte-shifts, to avoid double-counting the carry.
+            x0 = _mm256_add_epi32(x0, carry);
+            // store first to allow destructive shuffle (non-avx pshufb if needed)
+            _mm256_store_si256(datavec, x0);
+
+            x1 = _mm256_add_epi32(_mm256_permutevar8x32_epi32(x0, shuff_idx), x1);
+            _mm256_store_si256(datavec +1, x1);
+
+            // broadcast the high element for next vector
+            carry = _mm256_permutevar8x32_epi32(x1, shuff_idx);
+        }
+
+        // handle the leftover elements
+        data = (T*)datavec;
+        *data += *(data-1);
+        inplace_prefix_sum<addone>(data, end);
     }
 
     // Dispatch prefix sum to vectorized implementation if possible

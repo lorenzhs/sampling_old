@@ -53,3 +53,18 @@ struct global_stats {
     void push_fix(double t) { s_fix.push(t); }
     statistics s_sum, s_gen, s_prefsum, s_fix;
 };
+
+/*
+// Print SIMD registers
+void print128_num(__m128i var) {
+    uint32_t *val = (uint32_t*) &var;
+    printf("Numerical: %i %i %i %i \n", val[0], val[1], val[2], val[3]);
+}
+
+void print256_num(__m256i var) {
+    uint32_t *val = (uint32_t*) &var;
+    printf("Numerical: %i %i %i %i %i %i %i %i \n",
+           val[0], val[1], val[2], val[3], val[4], val[5],
+           val[6], val[7]);
+}
+*/
