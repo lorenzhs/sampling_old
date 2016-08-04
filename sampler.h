@@ -279,47 +279,24 @@ struct sampler {
         holes[0] = -1; // dummy
         size_t hole_idx = 1;
 
-        if (k < (1<<20) || to_remove < 1024) {
-            // For small sample sizes, Algorithm R has more overhead
-            std::mt19937 gen(seed);
-            // -1 because range is inclusive
-            std::uniform_int_distribution<size_t> dist(0, end-begin-1);
-            size_t remaining_to_remove = to_remove;
-            while (remaining_to_remove > 0) {
-                size_t pos = dist(gen);
-                if (*(begin + pos) > -1) {
-                    *(begin + pos) = -1;
-                    remaining_to_remove--;
+        const size_t basecase = 1024;
+        // Somehow the sorted hash sampler is really slow for large k
+        if (sorted && k < (1<<22)) {
+            // SORTED hash sampling
+            SortedHashSampling<> hs((ULONG)seed, to_remove);
+            SeqDivideSampling<StochasticLib1,SortedHashSampling<>> s(
+                hs, basecase, (ULONG)seed);
+            s.sample(end-begin, to_remove, [&](auto pos) {
                     holes[hole_idx++] = pos;
-                }
-            }
+                });
+        } else {
+            HashSampling<> hs((ULONG)seed, to_remove);
+            SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
+            s.sample(end-begin, to_remove, [&](auto pos) {
+                    holes[hole_idx++] = pos;
+                });
             if (sorted)
                 std::sort(holes.get() + 1, holes.get() + to_remove + 1);
-        } else {
-            // For large sample sizes, using Algorithm R is faster
-            // Configure & run sampler to pick elements to delete
-
-            const size_t basecase = 1024;
-            // Somehow the sorted hash sampler is really slow for large k
-            if (sorted && k < (1<<22)) {
-                // SORTED hash sampling
-                SortedHashSampling<> hs((ULONG)seed, to_remove);
-                SeqDivideSampling<StochasticLib1,SortedHashSampling<>> s(
-                    hs, basecase, (ULONG)seed);
-                s.sample(end-begin, to_remove, [&](auto pos) {
-                        // *(begin + pos) = -1;
-                        holes[hole_idx++] = pos;
-                    });
-            } else {
-                HashSampling<> hs((ULONG)seed, to_remove);
-                SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
-                s.sample(end-begin, to_remove, [&](auto pos) {
-                        // *(begin + pos) = -1;
-                        holes[hole_idx++] = pos;
-                    });
-                if (sorted)
-                    std::sort(holes.get() + 1, holes.get() + to_remove + 1);
-            }
         }
         assert(hole_idx == to_remove + 1);
 
