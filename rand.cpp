@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
                 { return MKL_gen::generate_block(
                         begin, end-begin, p, seed); },
                 [](auto begin, auto end)
-                { return sampler::inplace_prefix_sum_disp<true>(begin, end); }, stats);
+                { return sampler::inplace_prefix_sum_disp<true>(begin, end); }, stats, very_verbose);
 #endif
 
 #ifndef NOSTD
@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
                 [](auto begin, auto end, double p, unsigned int seed)
                 { return std_gen::generate_block(begin, end, p, seed); },
                 [](auto begin, auto end)
-                { return sampler::inplace_prefix_sum_disp<false>(begin, end); }, stats);
+                { return sampler::inplace_prefix_sum_disp<false>(begin, end); }, stats, very_verbose);
 #endif
         }, data, num_threads, 100, "warmup");
 
