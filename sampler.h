@@ -97,7 +97,7 @@ struct sampler {
     // Dispatch prefix sum to vectorized implementation if possible
     template <bool addone, typename It,
               typename value_type = typename std::iterator_traits<It>::value_type>
-    static typename std::enable_if<std::is_same<value_type, int>::value>::type
+    static typename std::enable_if_t<std::is_same<value_type, int>::value>
     inplace_prefix_sum_disp(It begin, It end) {
         inplace_prefix_sum_sse<addone>(begin, end-begin);
     }
@@ -105,7 +105,7 @@ struct sampler {
     // Fallback to non-vectorized implementation
     template <bool addone, typename It,
               typename value_type = typename std::iterator_traits<It>::value_type>
-    static typename std::enable_if<!std::is_same<value_type, int>::value>::type
+    static typename std::enable_if_t<!std::is_same<value_type, int>::value>
     inplace_prefix_sum_disp(It begin, It end) {
         inplace_prefix_sum<addone>(begin, end);
     }
