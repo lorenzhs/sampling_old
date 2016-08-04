@@ -43,10 +43,9 @@ struct sampler {
     template <bool addone, typename T>
     static void inplace_prefix_sum_sse(T* data, size_t n) {
         static_assert(std::is_same<T, int>::value, "can only do int");
-        constexpr int elemsz = sizeof(T);
 
         __m128i *datavec = (__m128i*)data;
-        const int vec_elems = sizeof(*datavec)/elemsz;
+        const int vec_elems = sizeof(*datavec)/sizeof(T);
 
         if (addone) data[0]--; // fix first element
 
@@ -64,11 +63,11 @@ struct sampler {
                 x1 = _mm_add_epi32(x1, ones);
             }
 
-            x0 = _mm_add_epi32(x0, _mm_slli_si128(x0, elemsz));
-            x1 = _mm_add_epi32(x1, _mm_slli_si128(x1, elemsz));
+            x0 = _mm_add_epi32(x0, _mm_slli_si128(x0, 4)); // sizeof(T)));
+            x1 = _mm_add_epi32(x1, _mm_slli_si128(x1, 4)); // sizeof(T)));
 
-            x0 = _mm_add_epi32(x0, _mm_slli_si128(x0, 2*elemsz));
-            x1 = _mm_add_epi32(x1, _mm_slli_si128(x1, 2*elemsz));
+            x0 = _mm_add_epi32(x0, _mm_slli_si128(x0, 8)); // 2*sizeof(T)));
+            x1 = _mm_add_epi32(x1, _mm_slli_si128(x1, 8)); // 2*sizeof(T)));
 
             // more shifting if vec_elems is larger
             // this has to go after the byte-shifts, to avoid double-counting the carry.
@@ -85,8 +84,10 @@ struct sampler {
 
         // handle the leftover elements
         T *ptr = (T*)datavec;
-        *ptr += *(ptr-1);
-        inplace_prefix_sum<addone>(ptr, data+n);
+        if (ptr < data + n) {
+            *ptr += *(ptr-1);
+            inplace_prefix_sum<addone>(ptr, data+n);
+        }
     }
 
     // AVX adaptation of the SSE2 prefix sum above.
@@ -152,9 +153,51 @@ struct sampler {
         }
 
         // handle the leftover elements
-        data = (T*)datavec;
-        *data += *(data-1);
-        inplace_prefix_sum<addone>(data, end);
+        if (data < end) {
+            data = (T*)datavec;
+            *data += *(data-1);
+            inplace_prefix_sum<addone>(data, end);
+        }
+    }
+
+    template <bool addone>
+    static void inplace_prefix_sum_avx2(int *a, size_t n) {
+        if (addone) a[0]--; // fix first element
+        int sum = 0;
+        int *end = a+n;
+        // fix alignment
+        while (((size_t)a & 31) && a < end) {
+            sum += *a;
+            if (addone) ++sum;
+            *a++ = sum;
+            --n;
+        }
+        __m256i offset = _mm256_set1_epi32(sum);
+        size_t i;
+        for (i = 0; (i+8) < n; i += 8) {
+            __m256i x = _mm256_load_si256((__m256i*)(a + i));
+
+            //shift1_AVX + add
+            __m256i t0 = _mm256_shuffle_epi32(x, _MM_SHUFFLE(2, 1, 0, 3));
+            __m256i t1 = _mm256_permute2x128_si256(t0, t0, 41);
+            x = _mm256_add_epi32(x, _mm256_blend_epi32(t0, t1, 0x11));
+            //shift2_AVX + add
+            t0 = _mm256_shuffle_epi32(x, _MM_SHUFFLE(1, 0, 3, 2));
+            t1 = _mm256_permute2x128_si256(t0, t0, 41);
+            x = _mm256_add_epi32(x, _mm256_blend_epi32(t0, t1, 0x33));
+            //shift3_AVX + add
+            x = _mm256_add_epi32(x,_mm256_permute2x128_si256(x, x, 41));
+
+            x = _mm256_add_epi32(x, offset);
+            _mm256_store_si256((__m256i*)(a+i), x);
+            //broadcast last element
+            offset = _mm256_shuffle_epi32(
+                _mm256_permute2x128_si256(x, x, 0x11),0xff);
+        }
+        if (i < n) {
+            a[i] += a[i-1];
+            inplace_prefix_sum<addone>(a + i, end);
+        }
     }
 
     // Dispatch prefix sum to vectorized implementation if possible
@@ -294,7 +337,7 @@ struct sampler {
         ssize_t pos = to_remove;
         // handle case where the last element is to be removed
         // revert last postincrement even if loop doesn't match
-        if (begin + indices[--pos] == last) { --last; }
+        if (begin + indices[pos] == last) { --last; --pos; }
         while (pos > 0) {
             //std::iter_swap(begin + indices[pos--], last--);
             *(begin + indices[pos--]) = std::move(*last--);
