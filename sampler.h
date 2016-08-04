@@ -300,8 +300,9 @@ struct sampler {
             // Configure & run sampler to pick elements to delete
 
             const size_t basecase = 1024;
-            // SORTED hash sampling
-            if (sorted) {
+            // Somehow the sorted hash sampler is really slow for large k
+            if (sorted && k < (1<<22)) {
+                // SORTED hash sampling
                 SortedHashSampling<> hs((ULONG)seed, to_remove);
                 SeqDivideSampling<StochasticLib1,SortedHashSampling<>> s(
                     hs, basecase, (ULONG)seed);
@@ -316,6 +317,8 @@ struct sampler {
                         // *(begin + pos) = -1;
                         holes[hole_idx++] = pos;
                     });
+                if (sorted)
+                    std::sort(holes.get() + 1, holes.get() + to_remove + 1);
             }
         }
         assert(hole_idx == to_remove + 1);
