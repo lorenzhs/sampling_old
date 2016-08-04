@@ -156,7 +156,7 @@ struct sampler {
         if (data < end) {
             data = (T*)datavec;
             *data += *(data-1);
-            inplace_prefix_sum<addone>(data, end);
+            inplace_prefix_sum<addone>(data, (T*)end);
         }
     }
 
