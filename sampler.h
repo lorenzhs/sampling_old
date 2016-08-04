@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <random>
+#include <immintrin.h>
 
 #include "timer.h"
 #include <sampling/methodR.h>
@@ -20,7 +21,8 @@ struct sampler {
         return std::make_pair(p, b);
     }
 
-    template <typename It>
+    // MKL generates 0-based deviates, std::geometric_distribution is 1-based
+    template <bool addone, typename It>
     static void inplace_prefix_sum(It begin, It end) {
         using value_type = typename std::iterator_traits<It>::value_type;
 
@@ -28,12 +30,87 @@ struct sampler {
         value_type sum = *begin;
 
         while (++begin != end) {
-            sum += *begin + 1;
+            sum += *begin;
+            if (addone) sum++;
             *begin = sum;
         }
     }
 
-    template <size_t unroll = 8, typename It>
+
+    // Based on http://stackoverflow.com/a/32501562/3793885 by Peter Cordes
+    // In-place prefix sum, optionally incrementing the sum between elements
+    // (required for MKL geometric distribution...)
+    template <bool addone, typename T>
+    static int inplace_prefix_sum_sse(T* data, size_t n) {
+        static_assert(std::is_same<T, int>::value, "can only do int");
+        constexpr int elemsz = sizeof(T);
+
+        __m128i *datavec = (__m128i*)data;
+        const int vec_elems = sizeof(*datavec)/elemsz;
+
+        if (addone) data[0]--; // fix first element
+
+        // don't start an iteration beyond this
+        const __m128i *endp = (__m128i*) (data + n - 2*vec_elems);
+        __m128i carry = _mm_setzero_si128();
+        const __m128i ones = _mm_set1_epi32(1);
+
+        for(; datavec <= endp ; datavec += 2) {
+            __m128i x0 = _mm_load_si128(datavec + 0);
+            __m128i x1 = _mm_load_si128(datavec + 1); // unroll / pipeline by 1
+
+            if (addone) {
+                x0 = _mm_add_epi32(x0, ones);
+                x1 = _mm_add_epi32(x1, ones);
+            }
+
+            x0 = _mm_add_epi32(x0, _mm_slli_si128(x0, elemsz));
+            x1 = _mm_add_epi32(x1, _mm_slli_si128(x1, elemsz));
+
+            x0 = _mm_add_epi32(x0, _mm_slli_si128(x0, 2*elemsz));
+            x1 = _mm_add_epi32(x1, _mm_slli_si128(x1, 2*elemsz));
+
+            // more shifting if vec_elems is larger
+            // this has to go after the byte-shifts, to avoid double-counting the carry.
+            x0 = _mm_add_epi32(x0, carry);
+            // store first to allow destructive shuffle (non-avx pshufb if needed)
+            _mm_store_si128(datavec +0, x0);
+
+            x1 = _mm_add_epi32(_mm_shuffle_epi32(x0, _MM_SHUFFLE(3,3,3,3)), x1);
+            _mm_store_si128(datavec +1, x1);
+
+            // broadcast the high element for next vector
+            carry = _mm_shuffle_epi32(x1, _MM_SHUFFLE(3,3,3,3));
+        }
+
+        // handle the leftover elements
+        T *ptr = (T*)datavec, *endptr = data + n;
+        T sum = *(ptr - 1);
+        while (ptr < endptr) {
+            sum += *ptr;
+            if (addone) ++sum;
+            *ptr++ = sum;
+        }
+        return data[n-1];
+    }
+
+    // Dispatch prefix sum to vectorized implementation if possible
+    template <bool addone, typename It,
+              typename value_type = typename std::iterator_traits<It>::value_type>
+    static typename std::enable_if<std::is_same<value_type, int>::value>::type
+    inplace_prefix_sum_disp(It begin, It end) {
+        inplace_prefix_sum_sse<addone>(begin, end-begin);
+    }
+
+    // Fallback to non-vectorized implementation
+    template <bool addone, typename It,
+              typename value_type = typename std::iterator_traits<It>::value_type>
+    static typename std::enable_if<!std::is_same<value_type, int>::value>::type
+    inplace_prefix_sum_disp(It begin, It end) {
+        inplace_prefix_sum<addone>(begin, end);
+    }
+
+    template <bool addone, size_t unroll = 8, typename It>
     static void inplace_prefix_sum_unroll(It begin, It end) {
         using value_type = typename std::iterator_traits<It>::value_type;
         value_type sum = 0;
@@ -41,7 +118,8 @@ struct sampler {
         while(begin + unroll < end) {
             faux_unroll<unroll>::call(
                 [&](size_t i){
-                    sum += *(begin + i) + 1;
+                    sum += *(begin + i);
+                    if (addone) ++sum;
                     *(begin + i) = sum;
                 });
             begin += unroll;
