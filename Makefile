@@ -35,7 +35,7 @@ CFLAGS+=-DFIX_STABLE
 SUFF:=${SUFF}S
 endif
 
-.PHONY: rand
+.PHONY: rand pgo
 
 rand: rand.cpp *.h
 ifneq ($(SUFF),)
@@ -68,7 +68,7 @@ buildall:
 	B64=1 STABLE=1 make rand
 
 buildall-pgo:
-	B64=0 make rand-pgo
-	B64=0 STABLE=1 make rand-pgo
-	B64=1 make rand-pgo
-	B64=1 STABLE=1 make rand-pgo
+	B64=0 make pgo
+	B64=0 STABLE=1 make pgo
+	B64=1 make pgo
+	B64=1 STABLE=1 make pgo
