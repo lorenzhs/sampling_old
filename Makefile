@@ -37,6 +37,15 @@ endif
 
 .PHONY: rand
 
+pgo: rand.cpp *.h
+ifneq ($(SUFF),)
+	@echo "Output name is rand${SUFF}-pgo"
+endif
+	rm -f rand.gcda
+	${CXX} ${CFLAGS} ${OPT} -fprofile-generate -o rand${SUFF}-pgo rand.cpp ${LDFLAGS}
+	./rand${SUFF}-pgo -i 100
+	${CXX} ${CFLAGS} ${OPT} -fprofile-use -o rand${SUFF}-pgo rand.cpp ${LDFLAGS}
+
 rand: rand.cpp *.h
 ifneq ($(SUFF),)
 	@echo "Output name is rand${SUFF}"
@@ -57,3 +66,9 @@ buildall:
 	B64=0 STABLE=1 make rand
 	B64=1 make rand
 	B64=1 STABLE=1 make rand
+
+buildall-pgo:
+	B64=0 make rand-pgo
+	B64=0 STABLE=1 make rand-pgo
+	B64=1 make rand-pgo
+	B64=1 STABLE=1 make rand-pgo
