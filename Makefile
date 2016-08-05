@@ -37,6 +37,12 @@ endif
 
 .PHONY: rand
 
+rand: rand.cpp *.h
+ifneq ($(SUFF),)
+	@echo "Output name is rand${SUFF}"
+endif
+	${CXX} ${CFLAGS} ${OPT} -o rand${SUFF} rand.cpp ${LDFLAGS}
+
 pgo: rand.cpp *.h
 ifneq ($(SUFF),)
 	@echo "Output name is rand${SUFF}-pgo"
@@ -45,12 +51,6 @@ endif
 	${CXX} ${CFLAGS} ${OPT} -fprofile-generate -o rand${SUFF}-pgo rand.cpp ${LDFLAGS}
 	./rand${SUFF}-pgo -i 100
 	${CXX} ${CFLAGS} ${OPT} -fprofile-use -o rand${SUFF}-pgo rand.cpp ${LDFLAGS}
-
-rand: rand.cpp *.h
-ifneq ($(SUFF),)
-	@echo "Output name is rand${SUFF}"
-endif
-	${CXX} ${CFLAGS} ${OPT} -o rand${SUFF} rand.cpp ${LDFLAGS}
 
 debug:
 ifneq ($(SUFF),)
