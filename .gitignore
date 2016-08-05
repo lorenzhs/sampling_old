@@ -1,5 +1,6 @@
 rand
 rand_*
+rand-*
 rand32*
 rand64*
 randS
@@ -7,6 +8,8 @@ rand*-dbg
 r_*
 perf.data
 perf.data.old
+*.gcda
+extern
 GPATH
 GRTAGS
 GTAGS
