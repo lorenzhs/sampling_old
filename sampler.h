@@ -280,7 +280,7 @@ struct sampler {
         size_t hole_idx = 1;
 
         const size_t basecase = 1024;
-        // Somehow the sorted hash sampler is really slow for large k
+        // Only use for k up to 4MM, it gets slow after that
         if (sorted && k < (1<<22)) {
             // SORTED hash sampling
             SortedHashSampling<> hs((ULONG)seed, to_remove);
@@ -301,7 +301,7 @@ struct sampler {
         assert(hole_idx == to_remove + 1);
 
         if (sorted) {
-            assert(std::is_sorted(holes.get() + 1, holes.get() + to_remove + 1));
+            assert(std::is_sorted(holes.get(), holes.get() + to_remove + 1));
         }
 
         return holes;
