@@ -49,7 +49,9 @@ ifneq ($(SUFF),)
 endif
 	rm -f rand.gcda
 	${CXX} ${CFLAGS} ${OPT} -fprofile-generate -o rand${SUFF}-pgo rand.cpp ${LDFLAGS}
-	./rand${SUFF}-pgo -i 100
+	./rand${SUFF}-pgo -i 1000 -k 65536
+	./rand${SUFF}-pgo -i 100 -k 1048576
+	./rand${SUFF}-pgo -i 10 -k 33554432
 	${CXX} ${CFLAGS} ${OPT} -fprofile-use -o rand${SUFF}-pgo rand.cpp ${LDFLAGS}
 
 debug:
