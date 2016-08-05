@@ -20,7 +20,8 @@
 template <typename T, typename F>
 void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
          int num_threads, int iterations, std::string name,
-         const std::string extra = "", const bool verbose = false) {
+         const std::string extra = "", const bool verbose = false,
+         const bool quiet = false) {
 
     std::vector<std::thread> threads;
     threads.reserve(num_threads);
@@ -57,6 +58,7 @@ void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
                       << extra << std::endl;
     }
 
+    if (quiet) return;
     std::cout << "RESULT runner=" << name
               << " time=" << stats.s_sum.avg()
               << " stddev=" << stats.s_sum.stddev();
@@ -95,6 +97,7 @@ int main(int argc, char** argv) {
     int iterations = args.get<int>("i", 1);
     const bool verbose = args.is_set("v") || args.is_set("vv");
     const bool very_verbose = args.is_set("vv");
+    const bool quiet = args.is_set("q");
 
     double p; size_t ssize;
     std::tie(p, ssize) = sampler::calc_params(universe, k);
@@ -111,7 +114,7 @@ int main(int argc, char** argv) {
             data[thread] = std::make_unique<T[]>(ssize); // weak scaling
             // ensure that the memory is initialized
             std::fill(data[thread].get(), data[thread].get() + ssize, 0);
-        }, data, num_threads, 1, "init");
+        }, data, num_threads, 1, "init", "", false, quiet);
 
     // warmup
     size_t k_warmup = std::min<size_t>(1<<16, k);
@@ -141,7 +144,7 @@ int main(int argc, char** argv) {
                 [](auto begin, auto end)
                 { return sampler::inplace_prefix_sum_disp<false>(begin, end); }, stats);
 #endif
-        }, data, num_threads, 100, "warmup");
+        }, data, num_threads, 100, "warmup", "", verbose, quiet);
 
     std::stringstream extra_stream;
     extra_stream << " k=" << k << " b=" << ssize
