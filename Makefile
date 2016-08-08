@@ -77,3 +77,9 @@ buildall-pgo:
 	B64=0 STABLE=1 make pgo
 	B64=1 make pgo
 	B64=1 STABLE=1 make pgo
+
+everything: buildall buildall-pgo
+	make rand
+	STABLE=1 make rand
+	make pgo
+	STABLE=1 make pgo
