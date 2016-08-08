@@ -35,6 +35,9 @@ CFLAGS+=-DFIX_STABLE
 SUFF:=${SUFF}S
 endif
 
+GIT_VERSION := $(shell git describe --abbrev=7 --dirty --always --tags)
+CFLAGS+=-DVERSION=\"$(GIT_VERSION)\"
+
 .PHONY: rand pgo
 
 rand: rand.cpp *.h

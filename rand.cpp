@@ -16,6 +16,9 @@
 #include "std_gen.h"
 #endif
 
+#ifndef VERSION
+#define VERSION "n/a"
+#endif
 
 template <typename T, typename F>
 void run(F&& runner, const std::vector<std::unique_ptr<T[]>> &data,
@@ -105,7 +108,7 @@ int main(int argc, char** argv) {
     std::cout << "Geometric sampler, " << k << " samples per thread "
               << "(p = " << p << ") from universe of size " << universe
               << ", using " << num_threads << " thread(s), "
-              << iterations << " iteration(s)." << std::endl;
+              << iterations << " iteration(s), git: " << VERSION << std::endl;
 
     auto data = std::vector<std::unique_ptr<T[]>>(num_threads);
     // initialize in parallel
