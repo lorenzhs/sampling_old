@@ -94,15 +94,15 @@ struct sampler {
 
     // AVX adaptation of the SSE2 prefix sum above.
     // Due to inter-lane shuffling, it's actually slower.
-    template <bool addone, typename T>
-    static void inplace_prefix_sum_avx(T* data, size_t n) {
-        static_assert(std::is_same<T, int>::value, "can only do int");
+    template <bool addone>
+    static void inplace_prefix_sum_avx(int* data, size_t n) {
+        using T = int;
         const T* end = data + n;
 
         if (addone) data[0]--; // fix first element
-
         T sum = 0;
-        // fix alignment
+        // process first few elements manually to fulfill the 32-byte alignment
+        // requirement of _mm256_load_si256
         while (((size_t)data & 31) && data < end) {
             sum += *data;
             if (addone) ++sum;
@@ -111,21 +111,19 @@ struct sampler {
         }
 
         __m256i *datavec = (__m256i*)data;
-        const int vec_elems = sizeof(*datavec)/sizeof(T);
+        const int vec_elems = sizeof(__m256i)/sizeof(T);
 
         // don't start an iteration beyond this
         const __m256i *endp = (__m256i*) (data + n - 2*vec_elems);
         __m256i carry = _mm256_set1_epi32(sum);
-        const __m256i ones = _mm256_set1_epi32(1);
-        const __m256i shuff_idx = _mm256_set1_epi32(7);
 
         for(; datavec <= endp ; datavec += 2) {
             __m256i x0 = _mm256_load_si256(datavec + 0);
             __m256i x1 = _mm256_load_si256(datavec + 1); // unroll / pipeline by 1
 
             if (addone) {
-                x0 = _mm256_add_epi32(x0, ones);
-                x1 = _mm256_add_epi32(x1, ones);
+                x0 = _mm256_add_epi32(x0, _mm256_set1_epi32(1));
+                x1 = _mm256_add_epi32(x1, _mm256_set1_epi32(1));
             }
 
             x0 = _mm256_add_epi32(x0,_mm256_alignr_epi8(x0,
@@ -147,11 +145,11 @@ struct sampler {
             // store first to allow destructive shuffle (non-avx pshufb if needed)
             _mm256_store_si256(datavec, x0);
 
-            x1 = _mm256_add_epi32(_mm256_permutevar8x32_epi32(x0, shuff_idx), x1);
+            x1 = _mm256_add_epi32(_mm256_permutevar8x32_epi32(x0, _mm256_set1_epi32(7)), x1);
             _mm256_store_si256(datavec +1, x1);
 
             // broadcast the high element for next vector
-            carry = _mm256_permutevar8x32_epi32(x1, shuff_idx);
+            carry = _mm256_permutevar8x32_epi32(x1, _mm256_set1_epi32(7));
         }
 
         // handle the leftover elements
@@ -159,46 +157,6 @@ struct sampler {
             data = (T*)datavec;
             *data += *(data-1);
             inplace_prefix_sum<addone>(data, (T*)end);
-        }
-    }
-
-    template <bool addone>
-    static void inplace_prefix_sum_avx2(int *a, size_t n) {
-        if (addone) a[0]--; // fix first element
-        int sum = 0;
-        int *end = a+n;
-        // fix alignment
-        while (((size_t)a & 31) && a < end) {
-            sum += *a;
-            if (addone) ++sum;
-            *a++ = sum;
-            --n;
-        }
-        __m256i offset = _mm256_set1_epi32(sum);
-        size_t i;
-        for (i = 0; (i+8) < n; i += 8) {
-            __m256i x = _mm256_load_si256((__m256i*)(a + i));
-
-            //shift1_AVX + add
-            __m256i t0 = _mm256_shuffle_epi32(x, _MM_SHUFFLE(2, 1, 0, 3));
-            __m256i t1 = _mm256_permute2x128_si256(t0, t0, 41);
-            x = _mm256_add_epi32(x, _mm256_blend_epi32(t0, t1, 0x11));
-            //shift2_AVX + add
-            t0 = _mm256_shuffle_epi32(x, _MM_SHUFFLE(1, 0, 3, 2));
-            t1 = _mm256_permute2x128_si256(t0, t0, 41);
-            x = _mm256_add_epi32(x, _mm256_blend_epi32(t0, t1, 0x33));
-            //shift3_AVX + add
-            x = _mm256_add_epi32(x,_mm256_permute2x128_si256(x, x, 41));
-
-            x = _mm256_add_epi32(x, offset);
-            _mm256_store_si256((__m256i*)(a+i), x);
-            //broadcast last element
-            offset = _mm256_shuffle_epi32(
-                _mm256_permute2x128_si256(x, x, 0x11),0xff);
-        }
-        if (i < n) {
-            a[i] += a[i-1];
-            inplace_prefix_sum<addone>(a + i, end);
         }
     }
 
