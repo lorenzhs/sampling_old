@@ -5,6 +5,7 @@ rand32*
 rand64*
 randS
 rand*-dbg
+*-pgo
 r_*
 perf.data
 perf.data.old
@@ -15,6 +16,7 @@ GRTAGS
 GTAGS
 logs/
 u_*
+highwayhash/
 # Created by https://www.gitignore.io/api/c++
 
 ### C++ ###
