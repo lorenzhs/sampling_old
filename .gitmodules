@@ -1,3 +1,6 @@
 [submodule "DistributedSampling"]
 	path = DistributedSampling
 	url = https://github.com/sebalamm/DistributedSampling
+[submodule "highwayhash"]
+	path = highwayhash
+	url = https://github.com/google/highwayhash

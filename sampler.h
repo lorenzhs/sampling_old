@@ -26,6 +26,7 @@ struct sampler {
     // MKL generates 0-based deviates, std::geometric_distribution is 1-based
     template <bool addone, typename It>
     static void inplace_prefix_sum(It begin, It end) {
+        PROFILER_FUNC;
         using value_type = typename std::iterator_traits<It>::value_type;
 
         if (begin == end) return;
@@ -44,6 +45,7 @@ struct sampler {
     // (required for MKL geometric distribution...)
     template <bool addone, typename T>
     static void inplace_prefix_sum_sse(T* data, size_t n) {
+        PROFILER_FUNC;
         static_assert(std::is_same<T, int>::value, "can only do int");
 
         __m128i *datavec = (__m128i*)data;
@@ -96,6 +98,7 @@ struct sampler {
     // Due to inter-lane shuffling, it's actually slower.
     template <bool addone, typename T>
     static void inplace_prefix_sum_avx(T* data, size_t n) {
+        PROFILER_FUNC;
         static_assert(std::is_same<T, int>::value, "can only do int");
         const T* end = data + n;
 
@@ -164,6 +167,7 @@ struct sampler {
 
     template <bool addone>
     static void inplace_prefix_sum_avx2(int *a, size_t n) {
+        PROFILER_FUNC;
         if (addone) a[0]--; // fix first element
         int sum = 0;
         int *end = a+n;
@@ -220,6 +224,7 @@ struct sampler {
 
     template <bool addone, size_t unroll = 8, typename It>
     static void inplace_prefix_sum_unroll(It begin, It end) {
+        PROFILER_FUNC;
         using value_type = typename std::iterator_traits<It>::value_type;
         value_type sum = 0;
 
@@ -242,6 +247,7 @@ struct sampler {
     // assumes holes[0] == -1 for simplified edge case handling
     template <typename It>
     static auto compact(It begin, It end, ssize_t* holes, size_t to_remove) {
+        PROFILER_FUNC;
         using value_type = typename std::iterator_traits<It>::value_type;
 
         It dest = begin;
@@ -269,6 +275,7 @@ struct sampler {
     template <typename It>
     static auto pick_holes(It begin, It end, size_t k, unsigned int seed,
                            bool sorted) {
+        PROFILER_FUNC;
         assert(end - begin > (long)k);
         const size_t to_remove = (end-begin) - k;
 

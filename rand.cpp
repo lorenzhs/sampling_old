@@ -4,6 +4,9 @@
 #include <mutex>
 #include <thread>
 
+#define PROFILER_ENABLED 0
+#include <highwayhash/profiler.h>
+
 #include "arg_parser.h"
 #include "util.h"
 #include "sampler.h"
@@ -201,4 +204,5 @@ int main(int argc, char** argv) {
             }
         }, data, num_threads, iterations, "std", extra);
 #endif
+    PROFILER_PRINT_RESULTS();
 }
