@@ -3,7 +3,7 @@
 universe=$((2**30))
 
 # sequential
-for logsamples in {10..27}; do
+for logsamples in {7..27}; do
     echo "==============================================="
     samples=$((2**$logsamples))
     iterations=$((2**30 / $samples))
@@ -25,7 +25,7 @@ echo ""
 universe=$((2**62))
 
 # sequential
-for logsamples in {10..27}; do
+for logsamples in {7..27}; do
     echo "==============================================="
     samples=$((2**$logsamples))
     iterations=$((2**30 / $samples))
