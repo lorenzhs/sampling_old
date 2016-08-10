@@ -23,7 +23,8 @@ struct sampler {
         return std::make_pair(p, b);
     }
 
-    // MKL generates 0-based deviates, std::geometric_distribution is 1-based
+    // deviates generated are 0-based, i.e. number of failures *between* samples
+    // we thus have to add one to every element to get the sample positions
     template <bool addone, typename It>
     static void inplace_prefix_sum(It begin, It end) {
         using value_type = typename std::iterator_traits<It>::value_type;
@@ -33,6 +34,7 @@ struct sampler {
 
         while (++begin != end) {
             sum += *begin;
+            // addone is a template parameter, thus no branch is emitted
             if (addone) sum++;
             *begin = sum;
         }
@@ -71,16 +73,16 @@ struct sampler {
             x0 = _mm_add_epi32(x0, _mm_slli_si128(x0, 8)); // 2*sizeof(T)));
             x1 = _mm_add_epi32(x1, _mm_slli_si128(x1, 8)); // 2*sizeof(T)));
 
-            // more shifting if vec_elems is larger
-            // this has to go after the byte-shifts, to avoid double-counting the carry.
+            // add the previous sum (carry)
             x0 = _mm_add_epi32(x0, carry);
-            // store first to allow destructive shuffle (non-avx pshufb if needed)
-            _mm_store_si128(datavec +0, x0);
+            // store first to allow destructive shuffle
+            _mm_store_si128(datavec, x0);
 
+            // add last element of x0 to all elements of x1 (carry)
             x1 = _mm_add_epi32(_mm_shuffle_epi32(x0, _MM_SHUFFLE(3,3,3,3)), x1);
-            _mm_store_si128(datavec +1, x1);
+            _mm_store_si128(datavec + 1, x1);
 
-            // broadcast the high element for next vector
+            // broadcast the high element of x1 as carry for the next iteration
             carry = _mm_shuffle_epi32(x1, _MM_SHUFFLE(3,3,3,3));
         }
 
@@ -92,73 +94,6 @@ struct sampler {
         }
     }
 
-    // AVX adaptation of the SSE2 prefix sum above.
-    // Due to inter-lane shuffling, it's actually slower.
-    template <bool addone>
-    static void inplace_prefix_sum_avx(int* data, size_t n) {
-        using T = int;
-        const T* end = data + n;
-
-        if (addone) data[0]--; // fix first element
-        T sum = 0;
-        // process first few elements manually to fulfill the 32-byte alignment
-        // requirement of _mm256_load_si256
-        while (((size_t)data & 31) && data < end) {
-            sum += *data;
-            if (addone) ++sum;
-            *data++ = sum;
-            --n;
-        }
-
-        __m256i *datavec = (__m256i*)data;
-        const int vec_elems = sizeof(__m256i)/sizeof(T);
-
-        // don't start an iteration beyond this
-        const __m256i *endp = (__m256i*) (data + n - 2*vec_elems);
-        __m256i carry = _mm256_set1_epi32(sum);
-
-        for(; datavec <= endp ; datavec += 2) {
-            __m256i x0 = _mm256_load_si256(datavec + 0);
-            __m256i x1 = _mm256_load_si256(datavec + 1); // unroll / pipeline by 1
-
-            if (addone) {
-                x0 = _mm256_add_epi32(x0, _mm256_set1_epi32(1));
-                x1 = _mm256_add_epi32(x1, _mm256_set1_epi32(1));
-            }
-
-            x0 = _mm256_add_epi32(x0,_mm256_alignr_epi8(x0,
-                 _mm256_permute2x128_si256(x0, x0, _MM_SHUFFLE(0, 0, 2, 0)), 12));
-            x1 = _mm256_add_epi32(x1, _mm256_alignr_epi8(x1,
-                 _mm256_permute2x128_si256(x1, x1, _MM_SHUFFLE(0, 0, 2, 0)), 12));
-
-            x0 = _mm256_add_epi32(x0, _mm256_alignr_epi8(x0,
-                 _mm256_permute2x128_si256(x0, x0, _MM_SHUFFLE(0, 0, 2, 0)), 8));
-            x1 = _mm256_add_epi32(x1, _mm256_alignr_epi8(x1,
-                 _mm256_permute2x128_si256(x1, x1, _MM_SHUFFLE(0, 0, 2, 0)), 8));
-
-            x0 = _mm256_add_epi32(x0, _mm256_permute2x128_si256(x0, x0, _MM_SHUFFLE(0, 0, 2, 0)));
-            x1 = _mm256_add_epi32(x1, _mm256_permute2x128_si256(x1, x1, _MM_SHUFFLE(0, 0, 2, 0)));
-
-            // more shifting if vec_elems is larger
-            // this has to go after the byte-shifts, to avoid double-counting the carry.
-            x0 = _mm256_add_epi32(x0, carry);
-            // store first to allow destructive shuffle (non-avx pshufb if needed)
-            _mm256_store_si256(datavec, x0);
-
-            x1 = _mm256_add_epi32(_mm256_permutevar8x32_epi32(x0, _mm256_set1_epi32(7)), x1);
-            _mm256_store_si256(datavec +1, x1);
-
-            // broadcast the high element for next vector
-            carry = _mm256_permutevar8x32_epi32(x1, _mm256_set1_epi32(7));
-        }
-
-        // handle the leftover elements
-        if (data < end) {
-            data = (T*)datavec;
-            *data += *(data-1);
-            inplace_prefix_sum<addone>(data, (T*)end);
-        }
-    }
 
     // Dispatch prefix sum to vectorized implementation if possible
     template <bool addone, typename It,
@@ -176,6 +111,7 @@ struct sampler {
         inplace_prefix_sum<addone>(begin, end);
     }
 
+    // unrolled version of inplace_prefix_sum - not really all that helpful
     template <bool addone, size_t unroll = 8, typename It>
     static void inplace_prefix_sum_unroll(It begin, It end) {
         using value_type = typename std::iterator_traits<It>::value_type;
