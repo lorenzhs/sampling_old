@@ -197,33 +197,34 @@ struct sampler {
         }
     }
 
-    // assumes holes[0] == -1 for simplified edge case handling
+
+    // Remove 'to_remove' dummies from the range [begin, end) (end is implicit).
+    // The holes array specifies the position of the dummies.  This allows for
+    // faster compaction than 'std::remove' because we can memmove the region
+    // between the holes into place.  Assumes that holes[to_remove] points to
+    // the element-beyond-last ('end')
     template <typename It>
-    static auto compact(It begin, It end, ssize_t* holes, size_t to_remove) {
+    static It compact(It begin,  ssize_t* holes, size_t to_remove) {
         using value_type = typename std::iterator_traits<It>::value_type;
 
+        if (holes[to_remove] == holes[to_remove - 1]) {
+            // Last element is a hole -> remove dummy to restore the assertion
+            to_remove--;
+        }
+
         It dest = begin;
+        // memmove aborts if src == dest, so we don't have to handle it
         for (size_t i = 0; i < to_remove; ++i) {
             assert(holes[i+1] > holes[i]);
             size_t size = holes[i+1] - holes[i] - 1;
-            //std::cout << "Moving " << size << " elements from index "
-            //          << holes[i] + 1 << " to " << dest-begin << std::endl;
             memmove(dest, begin + holes[i] + 1, size * sizeof(value_type));
             dest += size;
-        }
-        // do the last gap
-        auto srcpos = begin + holes[to_remove] + 1;
-        if (srcpos < end) {
-            // std::cout << "Moving last " << end-srcpos << " elements from "
-            //           << srcpos - begin << " to pos " << dest - begin
-            //           << " => last: " << dest + (end-srcpos) - begin
-            //           << " vs " << k << std::endl;
-            memmove(dest, srcpos, (end - srcpos) * sizeof(value_type));
-            dest += (end-srcpos);
         }
         return dest;
     }
 
+    // Sampling without replacement to pick position of holes.  Optimized for
+    // this scenario, not general purpose.
     template <typename It>
     static auto pick_holes(It begin, It end, size_t k, unsigned int seed,
                            bool sorted) {
@@ -234,8 +235,8 @@ struct sampler {
             seed = std::random_device{}();
         }
         auto holes = std::make_unique<int64_t[]>(to_remove + 1);
-        holes[0] = -1; // dummy
-        size_t hole_idx = 1;
+        holes[to_remove] = (end-begin);
+        size_t hole_idx = 0;
 
         const size_t basecase = 1024;
         // Only use for k up to 4MM, it gets slow after that
@@ -254,9 +255,9 @@ struct sampler {
                     holes[hole_idx++] = pos;
                 });
             if (sorted)
-                std::sort(holes.get() + 1, holes.get() + to_remove + 1);
+                std::sort(holes.get(), holes.get() + to_remove);
         }
-        assert(hole_idx == to_remove + 1);
+        assert(hole_idx == to_remove);
 
         if (sorted) {
             assert(std::is_sorted(holes.get(), holes.get() + to_remove + 1));
@@ -273,7 +274,7 @@ struct sampler {
         auto holes = pick_holes(begin, end, k, seed, true);
 
         size_t to_remove = (end-begin) - k;
-        return compact(begin, end, holes.get(), to_remove);
+        return compact(begin, holes.get(), to_remove);
     }
 
 
