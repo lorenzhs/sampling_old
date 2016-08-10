@@ -140,21 +140,18 @@ struct sampler {
     // between the holes into place.  Assumes that holes[to_remove] points to
     // the element-beyond-last ('end')
     template <typename It>
-    static It compact(It begin,  ssize_t* holes, size_t to_remove) {
+    static It compact(It begin, ssize_t* holes, size_t to_remove) {
         using value_type = typename std::iterator_traits<It>::value_type;
 
-        if (holes[to_remove] == holes[to_remove - 1]) {
-            // Last element is a hole -> remove dummy to restore the assertion
-            to_remove--;
-        }
-
-        It dest = begin;
+        It dest = begin + holes[0];
         // memmove aborts if src == dest, so we don't have to handle it
         for (size_t i = 0; i < to_remove; ++i) {
             assert(holes[i+1] > holes[i]);
             size_t size = holes[i+1] - holes[i] - 1;
+
             memmove(dest, begin + holes[i] + 1, size * sizeof(value_type));
             dest += size;
+            assert(begin + holes[i+1] - 1 == dest + i);
         }
         return dest;
     }
@@ -181,13 +178,15 @@ struct sampler {
             SortedHashSampling<> hs((ULONG)seed, to_remove);
             SeqDivideSampling<StochasticLib1,SortedHashSampling<>> s(
                 hs, basecase, (ULONG)seed);
-            s.sample(end-begin, to_remove, [&](auto pos) {
+            // end - begin - 1 because the range is inclusive
+            s.sample(end-begin-1, to_remove, [&](auto pos) {
                     holes[hole_idx++] = pos;
                 });
         } else {
             HashSampling<> hs((ULONG)seed, to_remove);
             SeqDivideSampling<> s(hs, basecase, (ULONG)seed);
-            s.sample(end-begin, to_remove, [&](auto pos) {
+            // end - begin - 1 because the range is inclusive
+            s.sample(end-begin-1, to_remove, [&](auto pos) {
                     holes[hole_idx++] = pos;
                 });
             if (sorted)
