@@ -6,7 +6,7 @@ MKLFLAGS = -L${MKL} -lmkl_intel_lp64 -lmkl_core -lmkl_sequential
 MKLLD = -Wl,-Bstatic ${MKLFLAGS} -Wl,-Bdynamic -ldl
 
 LDFLAGS=-lpthread libstocc.a
-CFLAGS=-std=c++14 -Wall -Wextra -Werror -g
+CFLAGS=-std=c++14 -Wall -Wextra -Werror -g -Iinclude
 OPT=-Ofast -DNDEBUG -march=native
 DEBUG=-O0 -march=native -fsanitize=address
 CFLAGS+=-IDistributedSampling/lib -IDistributedSampling/lib/tools -IDistributedSampling/extern/stocc -IDistributedSampling/extern/dSFMT
@@ -50,13 +50,13 @@ CFLAGS+=-DVERSION=\"$(GIT_VERSION)\"
 
 .PHONY: rand pgo
 
-rand: rand.cpp *.h
+rand: rand.cpp include/*.h
 ifneq ($(SUFF),)
 	@echo "Output name is rand${SUFF}"
 endif
 	${CXX} ${CFLAGS} ${OPT} -o rand${SUFF} rand.cpp ${LDFLAGS}
 
-pgo: rand.cpp *.h
+pgo: rand.cpp include/*.h
 ifneq ($(SUFF),)
 	@echo "Output name is rand${SUFF}-pgo"
 endif
