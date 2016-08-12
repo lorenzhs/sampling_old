@@ -6,7 +6,7 @@ MKLFLAGS = -L${MKL} -lmkl_intel_lp64 -lmkl_core -lmkl_sequential
 MKLLD = -Wl,-Bstatic ${MKLFLAGS} -Wl,-Bdynamic -ldl
 
 LDFLAGS=-lpthread libstocc.a
-CFLAGS=-std=c++14 -Wall -Wextra -Werror -g -Iinclude
+CFLAGS=-std=c++14 -Wall -Wextra -Werror -g
 OPT=-Ofast -DNDEBUG -march=native
 DEBUG=-O0 -march=native -fsanitize=address
 CFLAGS+=-IDistributedSampling/lib -IDistributedSampling/lib/tools -IDistributedSampling/extern/stocc -IDistributedSampling/extern/dSFMT
