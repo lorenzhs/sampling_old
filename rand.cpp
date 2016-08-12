@@ -119,33 +119,43 @@ int main(int argc, char** argv) {
             std::fill(data[thread].get(), data[thread].get() + ssize, 0);
         }, data, num_threads, 1, "init", "", false, quiet);
 
+
+    // Define the lambdas here because of an ICC bug that causes it to fail to
+    // compile with nested lamdbas.  Ugly preprocessor hackery for feature
+    // detection.
+    auto mkl_gen = [](auto begin, auto end, double p, unsigned int seed)
+#ifndef USE64BIT
+        { MKL_gen::generate_block(begin, end-begin, p, seed); };
+#else
+        {};
+#endif
+    auto std_gen = [](auto begin, auto end, double p, unsigned int seed)
+#ifndef NOSTD
+        { std_gen::generate_block(begin, end, p, seed); };
+#else
+        {};
+#endif
+    auto prefsum = [](auto begin, auto end)
+        { sampler::inplace_prefix_sum_disp<true>(begin, end); };
+
     // warmup
     size_t k_warmup = std::min<size_t>(1<<16, k);
     std::cout << "Running warmup (" << k_warmup << " samples)" << std::endl;
-    run([k_warmup, universe]
+    run([k_warmup, universe, mkl_gen, std_gen, prefsum]
         (auto data, int /*thread*/, int /*iteration*/, auto stats) {
             double p_warmup; size_t ssize_warmup;
             std::tie(p_warmup, ssize_warmup) =
                 sampler::calc_params(universe, k_warmup);
 #ifndef USE64BIT
             // MKL_gen
-            sampler::sample(
-                data, ssize_warmup, k_warmup, p_warmup, universe,
-                [](auto begin, auto end, double p, unsigned int seed)
-                { return MKL_gen::generate_block(
-                        begin, end-begin, p, seed); },
-                [](auto begin, auto end)
-                { return sampler::inplace_prefix_sum_disp<true>(begin, end); }, stats);
+            sampler::sample(data, ssize_warmup, k_warmup, p_warmup, universe,
+                            mkl_gen, prefsum, stats);
 #endif
 
 #ifndef NOSTD
             // std_gen
-            sampler::sample(
-                data, ssize_warmup, k_warmup, p_warmup, universe,
-                [](auto begin, auto end, double p, unsigned int seed)
-                { return std_gen::generate_block(begin, end, p, seed); },
-                [](auto begin, auto end)
-                { return sampler::inplace_prefix_sum_disp<true>(begin, end); }, stats);
+            sampler::sample(data, ssize_warmup, k_warmup, p_warmup, universe,
+                            std_gen, prefsum, stats);
 #endif
         }, data, num_threads, 100, "warmup", "", verbose, quiet);
 
@@ -158,16 +168,11 @@ int main(int argc, char** argv) {
 
 #ifndef USE64BIT
     // Measure MKL_gen
-    run([universe, k, p, ssize, num_threads, verbose, very_verbose]
+    run([mkl_gen, prefsum, universe, k, p, ssize, num_threads,
+         verbose, very_verbose]
         (auto data, int thread_id, int iteration, auto stats){
-            auto msg = sampler::sample(
-                data, ssize, k, p, universe,
-                [](auto begin, auto end, double p, unsigned int seed)
-                { return MKL_gen::generate_block(
-                        begin, end-begin, p, seed); },
-                [](auto begin, auto end)
-                { return sampler::inplace_prefix_sum_disp<true>(begin, end); },
-                stats, very_verbose);
+            auto msg = sampler::sample(data, ssize, k, p, universe,
+                                       mkl_gen, prefsum, stats, very_verbose);
 
             if (verbose) {
                 cout_mutex.lock();
@@ -183,15 +188,11 @@ int main(int argc, char** argv) {
 
 #ifndef NOSTD
     // Measure std_gen
-    run([universe, k, p, ssize, num_threads, verbose, very_verbose]
+    run([std_gen, prefsum, universe, k, p, ssize, num_threads,
+         verbose, very_verbose]
         (auto data, int thread_id, int iteration, auto stats){
-            auto msg = sampler::sample(
-                data, ssize, k, p, universe,
-                [](auto begin, auto end, double p, unsigned int seed)
-                { return std_gen::generate_block(begin, end, p, seed); },
-                [](auto begin, auto end)
-                { return sampler::inplace_prefix_sum_disp<true>(begin, end); },
-                stats, very_verbose);
+            auto msg = sampler::sample(data, ssize, k, p, universe,
+                                       std_gen, prefsum, stats, very_verbose);
 
             if (verbose) {
                 cout_mutex.lock();
