@@ -4,16 +4,16 @@
 #include <mutex>
 #include <thread>
 
-#include "arg_parser.h"
-#include "util.h"
-#include "sampler.h"
+#include "include/arg_parser.h"
+#include "include/util.h"
+#include "include/sampler.h"
 
 #ifndef USE64BIT
-#include "MKL_gen.h"
+#include "include/MKL_gen.h"
 #endif
 
 #ifndef NOSTD
-#include "std_gen.h"
+#include "include/std_gen.h"
 #endif
 
 #ifndef VERSION
