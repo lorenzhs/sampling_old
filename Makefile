@@ -7,9 +7,19 @@ MKLLD = -Wl,-Bstatic ${MKLFLAGS} -Wl,-Bdynamic -ldl
 
 LDFLAGS=-lpthread libstocc.a
 CFLAGS=-std=c++14 -Wall -Wextra -Werror -g
-OPT=-Ofast -DNDEBUG -march=native -flto=8
+OPT=-Ofast -DNDEBUG -march=native
 DEBUG=-O0 -march=native -fsanitize=address
 CFLAGS+=-IDistributedSampling/lib -IDistributedSampling/lib/tools -IDistributedSampling/extern/stocc -IDistributedSampling/extern/dSFMT
+
+PGO=0
+ifeq ("clang","$(findstring clang,$(CXX))")
+        OPT += -flto
+else ifeq ("icc","$(findstring icc,$(CXX))")
+        OPT += -ipo
+else
+        OPT += -flto=8
+        PGO=1
+endif
 
 flags ?= # runtime flags
 
@@ -73,13 +83,17 @@ buildall:
 	B64=1 STABLE=1 make rand
 
 buildall-pgo:
+ifeq ($(PGO),1)
 	B64=0 make pgo
 	B64=0 STABLE=1 make pgo
 	B64=1 make pgo
 	B64=1 STABLE=1 make pgo
+endif
 
 everything: buildall buildall-pgo
 	make rand
 	STABLE=1 make rand
+ifeq ($(PGO),1)
 	make pgo
 	STABLE=1 make pgo
+endif
