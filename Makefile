@@ -77,10 +77,10 @@ run:
 	@LD_LIBRARY_PATH=${MKL} ./rand ${flags}
 
 buildall:
-	B64=0 make rand
-	B64=0 STABLE=1 make rand
-	B64=1 make rand
-	B64=1 STABLE=1 make rand
+	make rand B64=0 &
+	make rand B64=0 STABLE=1 &
+	make rand B64=1 &
+	make rand B64=1 STABLE=1 &
 
 buildall-pgo:
 ifeq ($(PGO),1)
@@ -91,8 +91,8 @@ ifeq ($(PGO),1)
 endif
 
 everything: buildall buildall-pgo
-	make rand
-	STABLE=1 make rand
+	make rand &
+	STABLE=1 make rand &
 ifeq ($(PGO),1)
 	make pgo
 	STABLE=1 make pgo
