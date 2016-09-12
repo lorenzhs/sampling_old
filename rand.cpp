@@ -123,17 +123,17 @@ int main(int argc, char** argv) {
     // Define the lambdas here because of an ICC bug that causes it to fail to
     // compile with nested lamdbas.  Ugly preprocessor hackery for feature
     // detection.
-    auto mkl_gen = [](auto begin, auto end, double p, unsigned int seed)
 #ifndef USE64BIT
+    auto mkl_gen = [](auto begin, auto end, double p, unsigned int seed)
         { MKL_gen::generate_block(begin, end-begin, p, seed); };
 #else
-        {};
+    auto mkl_gen = [](auto, auto, double, unsigned int) {};
 #endif
-    auto std_gen = [](auto begin, auto end, double p, unsigned int seed)
 #ifndef NOSTD
+    auto std_gen = [](auto begin, auto end, double p, unsigned int seed)
         { std_gen::generate_block(begin, end, p, seed); };
 #else
-        {};
+    auto std_gen = [](auto, auto, double, unsigned int) {};
 #endif
     auto prefsum = [](auto begin, auto end)
         { sampler::inplace_prefix_sum_disp<true>(begin, end); };
