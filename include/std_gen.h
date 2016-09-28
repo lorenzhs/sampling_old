@@ -15,7 +15,7 @@ struct std_gen {
             seed = std::random_device{}();
         }
 
-        std::mt19937 gen(seed);
+        std::mt19937_64 gen(seed);
         std::geometric_distribution<value_type> dist(p);
 
         for (auto it = begin; it < end; ++it) {
